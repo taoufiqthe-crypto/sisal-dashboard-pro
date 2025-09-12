@@ -6,8 +6,9 @@ import { ProductManagement } from "@/components/products/ProductManagement";
 import { SalesManagement } from "@/components/sales/SalesManagement";
 import { Reports } from "@/components/reports/Reports";
 import { WithdrawalsManagement } from "@/components/withdrawals/WithdrawalsManagement";
-import { Settings } from "@/components/settings/Settings";
+import { Settings } from "@/components/Settings/Settings";
 import { Manufacturing } from "@/components/Manufacturing/Manufacturing";
+import { Terminal } from "@/components/terminal/Terminal";
 // NÃO PRECISA MAIS DESTE IMPORT, O CÓDIGO FOI MOVIDO PARA UM POP-UP
 // import { NewProduction } from "@/components/Manufacturing/NewProduction"; 
 // NÃO PRECISA MAIS DESTE IMPORT POR ENQUANTO
@@ -64,10 +65,12 @@ const Index = () => {
         return <WithdrawalsManagement />;
       case "reports":
         return <Reports />;
-      case "manufacturing":
-        return <Manufacturing onTabChange={setActiveTab} />;
-      case "settings":
-        return <Settings onProductAdded={handleProductAdded} />;
+      case "manufacturing":
+        return <Manufacturing onTabChange={setActiveTab} />;
+      case "terminal":
+        return <Terminal />;
+      case "settings":
+        return <Settings onProductAdded={handleProductAdded} />;
       default:
         return <Dashboard />;
     }

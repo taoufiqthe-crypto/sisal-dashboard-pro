@@ -25,6 +25,7 @@ const navigationItems = [
   { id: "withdrawals", label: "Retiradas", icon: DollarSign },
   { id: "reports", label: "Relatórios", icon: BarChart3 },
   { id: "manufacturing", label: "Fabricação", icon: Cog },
+  { id: "terminal", label: "Terminal", icon: PlusCircle },
   { id: "settings", label: "Configurações", icon: Settings },
 ];
 

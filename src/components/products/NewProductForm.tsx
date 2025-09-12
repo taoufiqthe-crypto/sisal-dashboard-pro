@@ -9,29 +9,31 @@ interface Product {
   id: number;
   name: string;
   price: number;
+  cost: number;
   stock: number;
   category: string;
 }
 
 interface NewProductFormProps {
-  onProductAdded: (newProduct: Product) => void;
+  onProductAdded: (newProduct: Omit<Product, "id">) => void;
 }
 
 export function NewProductForm({ onProductAdded }: NewProductFormProps) {
   const [newProduct, setNewProduct] = useState({
     name: "",
     price: "",
+    cost: "",
     stock: "",
     category: ""
   });
   const { toast } = useToast();
 
   const handleAddProduct = () => {
-    if (newProduct.name && newProduct.price && newProduct.stock && newProduct.category) {
+    if (newProduct.name && newProduct.price && newProduct.cost && newProduct.stock && newProduct.category) {
       const product = {
-        id: Date.now(),
         name: newProduct.name,
         price: parseFloat(newProduct.price),
+        cost: parseFloat(newProduct.cost),
         stock: parseInt(newProduct.stock),
         category: newProduct.category
       };
@@ -39,7 +41,7 @@ export function NewProductForm({ onProductAdded }: NewProductFormProps) {
       onProductAdded(product);
       
       // Limpa o formulário após adicionar
-      setNewProduct({ name: "", price: "", stock: "", category: "" });
+      setNewProduct({ name: "", price: "", cost: "", stock: "", category: "" });
       
       toast({
         title: "Produto Adicionado",
@@ -87,15 +89,26 @@ export function NewProductForm({ onProductAdded }: NewProductFormProps) {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="stock">Estoque</Label>
+          <Label htmlFor="cost">Custo (R$)</Label>
           <Input
-            id="stock"
+            id="cost"
             type="number"
-            value={newProduct.stock}
-            onChange={(e) => setNewProduct({ ...newProduct, stock: e.target.value })}
-            placeholder="100"
+            step="0.01"
+            value={newProduct.cost}
+            onChange={(e) => setNewProduct({ ...newProduct, cost: e.target.value })}
+            placeholder="18.00"
           />
         </div>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="stock">Estoque</Label>
+        <Input
+          id="stock"
+          type="number"
+          value={newProduct.stock}
+          onChange={(e) => setNewProduct({ ...newProduct, stock: e.target.value })}
+          placeholder="100"
+        />
       </div>
       <Button onClick={handleAddProduct} className="flex items-center space-x-2">
         <PlusCircle className="w-4 h-4" />
