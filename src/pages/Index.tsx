@@ -9,6 +9,7 @@ import { WithdrawalsManagement } from "@/components/withdrawals/WithdrawalsManag
 import { Settings } from "@/components/Settings/Settings";
 import { Manufacturing } from "@/components/Manufacturing/Manufacturing";
 import { Terminal } from "@/components/terminal/Terminal";
+import { BudgetManagement } from "@/components/budget/BudgetManagement";
 // NÃO PRECISA MAIS DESTE IMPORT, O CÓDIGO FOI MOVIDO PARA UM POP-UP
 // import { NewProduction } from "@/components/Manufacturing/NewProduction"; 
 // NÃO PRECISA MAIS DESTE IMPORT POR ENQUANTO
@@ -53,28 +54,35 @@ const Index = () => {
     setProducts((prevProducts) => [...prevProducts, productWithId]);
   };
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case "dashboard":
-        return <Dashboard />;
-      case "products":
-        return <ProductManagement products={products} onProductAdded={handleProductAdded} />;
-      case "sales":
-        return <SalesManagement products={products} />;
-      case "withdrawals":
-        return <WithdrawalsManagement />;
-      case "reports":
-        return <Reports />;
+  const handleSaleCreated = (budgetItems: any[]) => {
+    // Esta função será expandida quando integrarmos com o sistema de vendas
+    console.log("Venda criada a partir do orçamento:", budgetItems);
+  };
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case "dashboard":
+        return <Dashboard />;
+      case "products":
+        return <ProductManagement products={products} onProductAdded={handleProductAdded} />;
+      case "sales":
+        return <SalesManagement products={products} />;
+      case "budget":
+        return <BudgetManagement products={products} onSaleCreated={handleSaleCreated} />;
+      case "withdrawals":
+        return <WithdrawalsManagement />;
+      case "reports":
+        return <Reports />;
       case "manufacturing":
         return <Manufacturing onTabChange={setActiveTab} />;
       case "terminal":
         return <Terminal />;
       case "settings":
         return <Settings onProductAdded={handleProductAdded} />;
-      default:
-        return <Dashboard />;
-    }
-  };
+      default:
+        return <Dashboard />;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">

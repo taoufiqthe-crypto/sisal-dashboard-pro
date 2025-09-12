@@ -112,6 +112,7 @@ export function SalesManagement(props: SalesManagementProps) {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod['type']>('dinheiro');
   const [amountPaid, setAmountPaid] = useState("");
   const [customerName, setCustomerName] = useState("");
+  const [saleDate, setSaleDate] = useState("");
 
   const addProductToSale = () => {
     if (currentProduct && currentQuantity) {
@@ -166,7 +167,7 @@ export function SalesManagement(props: SalesManagementProps) {
        
       const newSale: Sale = {
         id: Date.now(),
-        date: new Date().toISOString().split('T')[0],
+        date: saleDate || new Date().toISOString().split('T')[0],
         products: selectedProducts.map(item => ({
           name: item.productName,
           quantity: item.quantity,
@@ -184,6 +185,7 @@ export function SalesManagement(props: SalesManagementProps) {
       setSelectedProducts([]);
       setAmountPaid("");
       setCustomerName("");
+      setSaleDate("");
       setSelectedPaymentMethod('dinheiro');
       setIsDialogOpen(false);
     }
@@ -215,6 +217,18 @@ export function SalesManagement(props: SalesManagementProps) {
             </DialogHeader>
              
             <div className="space-y-4">
+              {/* Data da venda */}
+              <div className="space-y-2">
+                <Label htmlFor="saleDate">Data da Venda</Label>
+                <Input
+                  id="saleDate"
+                  type="date"
+                  value={saleDate}
+                  onChange={(e) => setSaleDate(e.target.value)}
+                  max={new Date().toISOString().split('T')[0]}
+                />
+              </div>
+
               {/* Nome do cliente */}
               <div className="space-y-2">
                 <Label htmlFor="customer">Nome do Cliente (opcional)</Label>

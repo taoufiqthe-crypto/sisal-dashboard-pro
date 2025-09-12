@@ -22,6 +22,7 @@ const navigationItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "products", label: "Produtos", icon: Package },
   { id: "sales", label: "Vendas", icon: ShoppingCart },
+  { id: "budget", label: "Orçamentos", icon: BarChart3 },
   { id: "withdrawals", label: "Retiradas", icon: DollarSign },
   { id: "reports", label: "Relatórios", icon: BarChart3 },
   { id: "manufacturing", label: "Fabricação", icon: Cog },
@@ -75,7 +76,7 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
           <Button
   variant="default"
   className="flex items-center space-x-2"
-  onClick={() => onTabChange("new-sale")}
+  onClick={() => onTabChange("sales")}
 >
   <PlusCircle className="w-4 h-4" />
   <span>Nova Venda</span>
