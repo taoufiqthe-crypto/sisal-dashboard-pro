@@ -3,7 +3,12 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Package, Cog } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 
@@ -11,10 +16,9 @@ interface ManufacturingProps {
   onTabChange: (tab: string) => void;
 }
 
-// Função para carregar as produções do localStorage
 const loadProductionsFromLocalStorage = () => {
   try {
-    const storedProductions = localStorage.getItem('productions');
+    const storedProductions = localStorage.getItem("productions");
     return storedProductions ? JSON.parse(storedProductions) : [];
   } catch (error) {
     console.error("Failed to load productions from localStorage", error);
@@ -22,39 +26,38 @@ const loadProductionsFromLocalStorage = () => {
   }
 };
 
-// Função para calcular os totais por tipo de peça
-const getPieceTotals = (productions) => {
-  return productions.reduce((acc, production) => {
-    const pieceName = production.pieceName.toLowerCase();
-    if (acc[pieceName]) {
-      acc[pieceName] += production.quantity;
-    } else {
-      acc[pieceName] = production.quantity;
-    }
+const getPieceTotals = (productions: any[]) => {
+  return productions.reduce<Record<string, number>>((acc, production) => {
+    const pieceName = (production.pieceName || "").toLowerCase();
+    const qty = Number(production.quantity) || 0;
+    if (!pieceName) return acc;
+    acc[pieceName] = (acc[pieceName] || 0) + qty;
     return acc;
   }, {});
 };
 
 export function Manufacturing({ onTabChange }: ManufacturingProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [productions, setProductions] = useState(loadProductionsFromLocalStorage);
+  const [productions, setProductions] = useState<any[]>(loadProductionsFromLocalStorage);
   const [productionData, setProductionData] = useState({
     date: "",
     pieceName: "",
     quantity: "",
     gessoSacos: "",
+    colaborador: "",
   });
 
-  // Salva as produções no localStorage sempre que a lista de produções mudar
+  const [selectedColaborador, setSelectedColaborador] = useState<string>("Todos");
+
   useEffect(() => {
     try {
-      localStorage.setItem('productions', JSON.stringify(productions));
+      localStorage.setItem("productions", JSON.stringify(productions));
     } catch (error) {
       console.error("Failed to save productions to localStorage", error);
     }
   }, [productions]);
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setProductionData((prevData) => ({
       ...prevData,
@@ -63,37 +66,56 @@ export function Manufacturing({ onTabChange }: ManufacturingProps) {
   };
 
   const handleSaveProduction = () => {
-    // Cria um ID único para a nova produção
-    const newId = productions.length > 0 ? Math.max(...productions.map(p => p.id)) + 1 : 1;
+    const newId =
+      productions.length > 0
+        ? Math.max(...productions.map((p) => p.id || 0)) + 1
+        : 1;
+
     const newProduction = {
       ...productionData,
       id: newId,
-      quantity: Number(productionData.quantity),
-      gessoSacos: Number(productionData.gessoSacos),
+      quantity: Number(productionData.quantity) || 0,
+      gessoSacos: Number(productionData.gessoSacos) || 0,
     };
 
-    // Adiciona a nova produção à lista e atualiza o estado
-    setProductions((prevProductions) => [...prevProductions, newProduction]);
+    setProductions((prev) => [...prev, newProduction]);
 
-    // Limpa o formulário e fecha o modal
     setProductionData({
       date: "",
       pieceName: "",
       quantity: "",
       gessoSacos: "",
+      colaborador: "",
     });
     setIsModalOpen(false);
   };
 
-  const totalGessoSacos = productions.reduce((total, prod) => total + prod.gessoSacos, 0);
+  const totalGessoSacos = productions.reduce(
+    (total, prod) => total + (Number(prod.gessoSacos) || 0),
+    0
+  );
+
   const pieceTotals = getPieceTotals(productions);
+
+  // lista única de colaboradores cadastrados (removendo vazios)
+  const colaboradores = Array.from(
+    new Set(productions.map((p) => (p.colaborador || "").trim()).filter(Boolean))
+  );
+
+  // aplica filtro (se "Todos", mostra tudo)
+  const filteredProductions =
+    selectedColaborador === "Todos"
+      ? productions
+      : productions.filter((p) => (p.colaborador || "") === selectedColaborador);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Fabricação</h2>
-          <p className="text-muted-foreground">Monitore a produção de molduras e tabicas.</p>
+          <p className="text-muted-foreground">
+            Monitore a produção de molduras e tabicas.
+          </p>
         </div>
         <Button onClick={() => setIsModalOpen(true)}>
           <PlusCircle className="w-4 h-4 mr-2" />
@@ -101,17 +123,28 @@ export function Manufacturing({ onTabChange }: ManufacturingProps) {
         </Button>
       </div>
 
+      {/* Totais por peça (cards) */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* Renderiza um cartão para cada tipo de peça */}
-        {Object.keys(pieceTotals).map((pieceName) => (
-          <Card key={pieceName} className="p-6 flex items-center justify-between">
+        {Object.keys(pieceTotals).length === 0 ? (
+          <Card className="p-6">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">{pieceName.charAt(0).toUpperCase() + pieceName.slice(1)} Produzidas</p>
-              <h3 className="text-2xl font-bold mt-1">{pieceTotals[pieceName]}</h3>
+              <p className="text-sm font-medium text-muted-foreground">Nenhuma produção ainda</p>
+              <h3 className="text-2xl font-bold mt-1">—</h3>
             </div>
-            <Cog className="w-8 h-8 text-muted-foreground" />
           </Card>
-        ))}
+        ) : (
+          Object.keys(pieceTotals).map((pieceName) => (
+            <Card key={pieceName} className="p-6 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  {pieceName.charAt(0).toUpperCase() + pieceName.slice(1)} Produzidas
+                </p>
+                <h3 className="text-2xl font-bold mt-1">{pieceTotals[pieceName]}</h3>
+              </div>
+              <Cog className="w-8 h-8 text-muted-foreground" />
+            </Card>
+          ))
+        )}
 
         <Card className="p-6 flex items-center justify-between">
           <div>
@@ -122,7 +155,57 @@ export function Manufacturing({ onTabChange }: ManufacturingProps) {
         </Card>
       </div>
 
-      {/* Pop-up (modal) para Nova Produção */}
+      {/* FILTRO por colaborador — usando <select> nativo (evita bug de overlay) */}
+      <div className="flex items-center gap-4">
+        <Label>Filtrar por Colaborador:</Label>
+
+        <select
+          value={selectedColaborador}
+          onChange={(e) => setSelectedColaborador(e.target.value)}
+          className="w-[220px] border rounded-md p-2 bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100"
+        >
+          <option value="Todos">Todos</option>
+          {colaboradores.map((col) => (
+            <option key={col} value={col}>
+              {col}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Lista de produções filtradas */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {filteredProductions.length === 0 ? (
+          <div className="col-span-full text-center text-sm text-muted-foreground">
+            Nenhuma produção encontrada.
+          </div>
+        ) : (
+          filteredProductions.map((prod) => (
+            <Card key={prod.id} className="p-6">
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  <strong>Data:</strong>{" "}
+                  {prod.date ? new Date(prod.date).toLocaleDateString("pt-BR") : "-"}
+                </p>
+                <p>
+                  <strong>Peça:</strong> {prod.pieceName || "-"}
+                </p>
+                <p>
+                  <strong>Quantidade:</strong> {prod.quantity}
+                </p>
+                <p>
+                  <strong>Sacos de Gesso:</strong> {prod.gessoSacos}
+                </p>
+                <p className="text-green-600 font-semibold">
+                  👷 Colaborador: {prod.colaborador || "Não informado"}
+                </p>
+              </div>
+            </Card>
+          ))
+        )}
+      </div>
+
+      {/* Modal de criação */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent>
           <DialogHeader>
@@ -130,31 +213,28 @@ export function Manufacturing({ onTabChange }: ManufacturingProps) {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="date" className="text-right">
-                Data
-              </Label>
+              <Label htmlFor="date" className="text-right">Data</Label>
               <Input id="date" type="date" value={productionData.date} onChange={handleInputChange} className="col-span-3" />
             </div>
-            
+
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="pieceName" className="text-right">
-                Nome da Peça
-              </Label>
+              <Label htmlFor="pieceName" className="text-right">Nome da Peça</Label>
               <Input id="pieceName" value={productionData.pieceName} onChange={handleInputChange} className="col-span-3" placeholder="Ex: tabica 5x3" />
             </div>
-            
+
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="quantity" className="text-right">
-                Quantidade
-              </Label>
+              <Label htmlFor="quantity" className="text-right">Quantidade</Label>
               <Input id="quantity" type="number" value={productionData.quantity} onChange={handleInputChange} className="col-span-3" />
             </div>
-            
+
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="gessoSacos" className="text-right">
-                Sacos de Gesso
-              </Label>
+              <Label htmlFor="gessoSacos" className="text-right">Sacos de Gesso</Label>
               <Input id="gessoSacos" type="number" value={productionData.gessoSacos} onChange={handleInputChange} className="col-span-3" />
+            </div>
+
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="colaborador" className="text-right">Colaborador / Moldureiro</Label>
+              <Input id="colaborador" value={productionData.colaborador} onChange={handleInputChange} className="col-span-3" placeholder="Nome do colaborador" />
             </div>
           </div>
           <div className="flex justify-end">
@@ -165,3 +245,4 @@ export function Manufacturing({ onTabChange }: ManufacturingProps) {
     </div>
   );
 }
+
