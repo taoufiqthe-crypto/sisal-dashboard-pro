@@ -347,6 +347,36 @@ export function BudgetManagement({ products, onSaleCreated }: BudgetManagementPr
 
   return (
     <div className="space-y-6">
+      {/* Cabeçalho da Empresa - Gesso Primus */}
+      <div className="bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-xl p-6 border border-green-200 dark:border-green-800 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-4 bg-white dark:bg-slate-800 rounded-lg px-6 py-4 shadow-md border">
+              <img
+                src="/lovable-uploads/gessoprimus.png"
+                alt="Gesso Primus - Qualidade e Preço Baixo"
+                className="w-16 h-16 object-contain"
+              />
+              <div>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-green-500 bg-clip-text text-transparent">
+                  Gesso Primus
+                </h1>
+                <p className="text-lg text-slate-600 dark:text-slate-400 font-medium">Sistema de Orçamentos Profissional</p>
+                <p className="text-sm text-green-600 dark:text-green-400 font-semibold">Qualidade e Preço Baixo</p>
+              </div>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="bg-white dark:bg-slate-800 rounded-lg px-4 py-3 shadow-md border">
+              <p className="text-sm text-slate-600 dark:text-slate-400">CNPJ: {companyData.cnpj}</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">📧 {companyData.email}</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">📱 {companyData.phone}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Seção de Controles */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Orçamentos</h2>
