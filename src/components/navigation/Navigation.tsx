@@ -1,16 +1,16 @@
 // src/components/navigation/Navigation.tsx
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { 
-  LayoutDashboard, 
-  Package, 
-  ShoppingCart, 
-  BarChart3, 
+import {
+  LayoutDashboard,
+  Package,
+  ShoppingCart,
+  BarChart3,
   Settings,
   PlusCircle,
   DollarSign,
-  Cog
+  Cog,
+  User, // 👈 adicionado
 } from "lucide-react";
 
 interface NavigationProps {
@@ -22,6 +22,7 @@ const navigationItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "products", label: "Produtos", icon: Package },
   { id: "sales", label: "Vendas", icon: ShoppingCart },
+  { id: "customers", label: "Clientes", icon: User }, // 👈 nova aba Clientes
   { id: "budget", label: "Orçamentos", icon: BarChart3 },
   { id: "withdrawals", label: "Retiradas", icon: DollarSign },
   { id: "reports", label: "Relatórios", icon: BarChart3 },
@@ -74,16 +75,15 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
 
           {/* Botão de Nova Venda (Grupo da Direita) */}
           <Button
-  variant="default"
-  className="flex items-center space-x-2"
-  onClick={() => onTabChange("sales")}
->
-  <PlusCircle className="w-4 h-4" />
-  <span>Nova Venda</span>
-</Button>
+            variant="default"
+            className="flex items-center space-x-2"
+            onClick={() => onTabChange("sales")}
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>Nova Venda</span>
+          </Button>
         </div>
       </div>
     </div>
   );
 }
-              
