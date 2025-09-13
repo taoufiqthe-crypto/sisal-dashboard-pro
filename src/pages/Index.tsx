@@ -4,6 +4,7 @@ import { Navigation } from "@/components/navigation/Navigation";
 import { Dashboard } from "@/components/dashboard/Dashboard";
 import { ProductManagement } from "@/components/products/ProductManagement";
 import { SalesManagement } from "@/components/sales";
+import { StockManagement } from "@/components/stock/StockManagement";
 import { Reports } from "@/components/reports/Reports";
 import { WithdrawalsManagement } from "@/components/withdrawals/WithdrawalsManagement";
 import { Settings } from "@/components/Settings/Settings";
@@ -94,6 +95,13 @@ const Index = () => {
             products={products}
             customers={customers}
             setCustomers={setCustomers}
+          />
+        );
+      case "stock":
+        return (
+          <StockManagement
+            products={products}
+            setProducts={setProducts}
           />
         );
       case "customers":

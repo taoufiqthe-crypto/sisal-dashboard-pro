@@ -10,7 +10,8 @@ import {
   PlusCircle,
   DollarSign,
   Cog,
-  User, // 👈 adicionado
+  User,
+  Warehouse,
 } from "lucide-react";
 
 interface NavigationProps {
@@ -22,7 +23,8 @@ const navigationItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "products", label: "Produtos", icon: Package },
   { id: "sales", label: "Vendas", icon: ShoppingCart },
-  { id: "customers", label: "Clientes", icon: User }, // 👈 nova aba Clientes
+  { id: "stock", label: "Estoque", icon: Warehouse },
+  { id: "customers", label: "Clientes", icon: User },
   { id: "budget", label: "Orçamentos", icon: BarChart3 },
   { id: "withdrawals", label: "Retiradas", icon: DollarSign },
   { id: "reports", label: "Relatórios", icon: BarChart3 },
