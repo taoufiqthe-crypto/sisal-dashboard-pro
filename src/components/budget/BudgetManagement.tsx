@@ -220,118 +220,458 @@ export function BudgetManagement({ products, onSaleCreated }: BudgetManagementPr
   };
 
   const exportToExcel = () => {
-    // Dados de vendas por produto
+    const wb = XLSX.utils.book_new();
+    
+    // Configurar estilos para o Excel
+    const headerStyle = {
+      font: { bold: true, color: { rgb: "FFFFFF" } },
+      fill: { fgColor: { rgb: "4472C4" } },
+      alignment: { horizontal: "center", vertical: "center" }
+    };
+    
+    // Planilha de vendas com estilo
     const salesData = budgets
       .filter(b => b.status === 'vendido')
-      .flatMap(budget => 
-        budget.products.map(product => ({
-          'Data': budget.date,
+      .map(budget => ({
+        'ID Orçamento': budget.id,
+        'Data da Venda': new Date(budget.date).toLocaleDateString('pt-BR'),
+        'Nome do Cliente': budget.customerName,
+        'Telefone': budget.customerPhone || 'N/A',
+        'CPF/CNPJ': budget.customerDocument || 'N/A',
+        'Endereço': budget.customerAddress || 'N/A',
+        'Valor Total': `R$ ${budget.total.toFixed(2)}`,
+        'Lucro Obtido': `R$ ${budget.profit.toFixed(2)}`,
+        'Margem (%)': `${((budget.profit / budget.total) * 100).toFixed(1)}%`,
+        'Status': budget.status.toUpperCase()
+      }));
+    
+    const salesWs = XLSX.utils.json_to_sheet(salesData);
+    
+    // Adicionar cores e formatação
+    const salesRange = XLSX.utils.decode_range(salesWs['!ref'] || 'A1');
+    
+    // Colorir cabeçalho
+    for (let col = salesRange.s.c; col <= salesRange.e.c; col++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+      if (!salesWs[cellAddress]) continue;
+      salesWs[cellAddress].s = headerStyle;
+    }
+    
+    // Ajustar largura das colunas
+    const colWidths = [
+      { wch: 15 }, // ID
+      { wch: 15 }, // Data
+      { wch: 25 }, // Cliente
+      { wch: 15 }, // Telefone
+      { wch: 18 }, // CPF/CNPJ
+      { wch: 30 }, // Endereço
+      { wch: 15 }, // Total
+      { wch: 15 }, // Lucro
+      { wch: 12 }, // Margem
+      { wch: 12 }  // Status
+    ];
+    salesWs['!cols'] = colWidths;
+    
+    XLSX.utils.book_append_sheet(wb, salesWs, "📊 Vendas Realizadas");
+    
+    // Planilha de produtos por orçamento
+    const productsData: any[] = [];
+    budgets.forEach(budget => {
+      budget.products.forEach(item => {
+        productsData.push({
+          'ID Orçamento': budget.id,
+          'Data': new Date(budget.date).toLocaleDateString('pt-BR'),
           'Cliente': budget.customerName,
-          'Produto': product.name,
-          'Quantidade Vendida': product.quantity,
-          'Preço Unitário': product.price,
-          'Total': product.quantity * product.price,
-          'Orçamento #': budget.id
-        }))
-      );
-
-    // Dados de estoque atual
+          'Produto': item.name,
+          'Quantidade': item.quantity,
+          'Valor Unitário': `R$ ${item.price.toFixed(2)}`,
+          'Total Item': `R$ ${(item.quantity * item.price).toFixed(2)}`,
+          'Status Orçamento': budget.status.toUpperCase()
+        });
+      });
+    });
+    
+    const productsWs = XLSX.utils.json_to_sheet(productsData);
+    
+    // Colorir cabeçalho da planilha de produtos
+    const productsRange = XLSX.utils.decode_range(productsWs['!ref'] || 'A1');
+    for (let col = productsRange.s.c; col <= productsRange.e.c; col++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+      if (!productsWs[cellAddress]) continue;
+      productsWs[cellAddress].s = {
+        font: { bold: true, color: { rgb: "FFFFFF" } },
+        fill: { fgColor: { rgb: "70AD47" } },
+        alignment: { horizontal: "center", vertical: "center" }
+      };
+    }
+    
+    // Ajustar largura das colunas de produtos
+    const productColWidths = [
+      { wch: 15 }, // ID
+      { wch: 12 }, // Data
+      { wch: 25 }, // Cliente
+      { wch: 30 }, // Produto
+      { wch: 12 }, // Quantidade
+      { wch: 15 }, // Valor Unit
+      { wch: 15 }, // Total Item
+      { wch: 18 }  // Status
+    ];
+    productsWs['!cols'] = productColWidths;
+    
+    XLSX.utils.book_append_sheet(wb, productsWs, "📦 Produtos Vendidos");
+    
+    // Planilha de estoque com cores
     const stockData = products.map(product => ({
       'Produto': product.name,
       'Categoria': product.category,
       'Estoque Atual': product.stock,
-      'Preço de Venda': product.price,
-      'Custo': product.cost,
-      'Valor Total do Estoque': product.stock * product.cost
+      'Preço de Venda': `R$ ${product.price.toFixed(2)}`,
+      'Custo': `R$ ${product.cost.toFixed(2)}`,
+      'Valor Total Estoque': `R$ ${(product.stock * product.cost).toFixed(2)}`,
+      'Margem Lucro': `${(((product.price - product.cost) / product.price) * 100).toFixed(1)}%`,
+      'Status Estoque': product.stock < 20 ? 'BAIXO' : product.stock < 50 ? 'MÉDIO' : 'BOM'
     }));
-
-    // Criar workbook
-    const wb = XLSX.utils.book_new();
     
-    // Adicionar planilhas
-    const salesWs = XLSX.utils.json_to_sheet(salesData);
     const stockWs = XLSX.utils.json_to_sheet(stockData);
     
-    XLSX.utils.book_append_sheet(wb, salesWs, "Vendas por Produto");
-    XLSX.utils.book_append_sheet(wb, stockWs, "Estoque Atual");
+    // Colorir cabeçalho do estoque
+    const stockRange = XLSX.utils.decode_range(stockWs['!ref'] || 'A1');
+    for (let col = stockRange.s.c; col <= stockRange.e.c; col++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+      if (!stockWs[cellAddress]) continue;
+      stockWs[cellAddress].s = {
+        font: { bold: true, color: { rgb: "FFFFFF" } },
+        fill: { fgColor: { rgb: "FF6B35" } },
+        alignment: { horizontal: "center", vertical: "center" }
+      };
+    }
     
-    // Salvar arquivo
-    const fileName = `relatorio_gesso_primus_${new Date().toISOString().split('T')[0]}.xlsx`;
-    XLSX.writeFile(wb, fileName);
+    // Ajustar largura das colunas de estoque
+    const stockColWidths = [
+      { wch: 25 }, // Produto
+      { wch: 15 }, // Categoria
+      { wch: 15 }, // Estoque
+      { wch: 15 }, // Preço
+      { wch: 12 }, // Custo
+      { wch: 18 }, // Valor Total
+      { wch: 15 }, // Margem
+      { wch: 15 }  // Status
+    ];
+    stockWs['!cols'] = stockColWidths;
+    
+    XLSX.utils.book_append_sheet(wb, stockWs, "📋 Estoque Atual");
+    
+    // Planilha de resumo financeiro
+    const resumoData = [
+      {
+        'Métrica': 'Total de Orçamentos',
+        'Valor': budgets.length,
+        'Observação': 'Todos os orçamentos criados'
+      },
+      {
+        'Métrica': 'Orçamentos Convertidos',
+        'Valor': budgets.filter(b => b.status === 'vendido').length,
+        'Observação': 'Orçamentos que viraram vendas'
+      },
+      {
+        'Métrica': 'Taxa de Conversão',
+        'Valor': `${((budgets.filter(b => b.status === 'vendido').length / budgets.length) * 100).toFixed(1)}%`,
+        'Observação': 'Percentual de conversão'
+      },
+      {
+        'Métrica': 'Receita Total',
+        'Valor': `R$ ${budgets.filter(b => b.status === 'vendido').reduce((sum, b) => sum + b.total, 0).toFixed(2)}`,
+        'Observação': 'Soma de todas as vendas'
+      },
+      {
+        'Métrica': 'Lucro Total',
+        'Valor': `R$ ${budgets.filter(b => b.status === 'vendido').reduce((sum, b) => sum + b.profit, 0).toFixed(2)}`,
+        'Observação': 'Soma de todos os lucros'
+      }
+    ];
+    
+    const resumoWs = XLSX.utils.json_to_sheet(resumoData);
+    
+    // Colorir cabeçalho do resumo
+    const resumoRange = XLSX.utils.decode_range(resumoWs['!ref'] || 'A1');
+    for (let col = resumoRange.s.c; col <= resumoRange.e.c; col++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+      if (!resumoWs[cellAddress]) continue;
+      resumoWs[cellAddress].s = {
+        font: { bold: true, color: { rgb: "FFFFFF" } },
+        fill: { fgColor: { rgb: "E74C3C" } },
+        alignment: { horizontal: "center", vertical: "center" }
+      };
+    }
+    
+    // Ajustar largura das colunas do resumo
+    resumoWs['!cols'] = [
+      { wch: 25 }, // Métrica
+      { wch: 20 }, // Valor
+      { wch: 35 }  // Observação
+    ];
+    
+    XLSX.utils.book_append_sheet(wb, resumoWs, "💰 Resumo Financeiro");
+    
+    // Salvar arquivo com nome baseado na data
+    const today = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
+    XLSX.writeFile(wb, `Relatorio_Completo_${today}.xlsx`);
   };
 
   const printBudget = (budget: Budget) => {
     const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Orçamento #${budget.id} - ${companyData.name}</title>
-            <style>
-              body { font-family: Arial, sans-serif; margin: 20px; }
-              .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #22c55e; padding-bottom: 20px; }
-              .logo { color: #22c55e; font-size: 24px; font-weight: bold; }
-              .subtitle { color: #666; margin: 5px 0; }
-              .company-info { background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0; }
-              .client-info { margin: 20px 0; border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
-              .products { margin: 20px 0; }
-              .product-item { display: flex; justify-content: space-between; margin: 5px 0; padding: 5px 0; border-bottom: 1px solid #eee; }
-              .total { font-weight: bold; font-size: 18px; margin-top: 20px; text-align: right; }
-              .footer { margin-top: 30px; text-align: center; color: #666; border-top: 1px solid #ddd; padding-top: 20px; }
-              .info-row { margin: 5px 0; }
-            </style>
-          </head>
-          <body>
+    if (!printWindow) return;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Orçamento ${budget.id}</title>
+          <style>
+            body { 
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+              margin: 0; 
+              padding: 30px;
+              color: #333;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              min-height: 100vh;
+            }
+            .container {
+              background: white;
+              border-radius: 15px;
+              box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+              overflow: hidden;
+              max-width: 800px;
+              margin: 0 auto;
+            }
+            .header { 
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: white;
+              padding: 40px 30px;
+              text-align: center;
+              position: relative;
+            }
+            .header::after {
+              content: '';
+              position: absolute;
+              bottom: -20px;
+              left: 50%;
+              transform: translateX(-50%);
+              width: 0;
+              height: 0;
+              border-left: 20px solid transparent;
+              border-right: 20px solid transparent;
+              border-top: 20px solid #764ba2;
+            }
+            .header h1 { 
+              margin: 0; 
+              font-size: 2.5em; 
+              font-weight: 300;
+              text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            }
+            .header p { 
+              margin: 5px 0; 
+              opacity: 0.9;
+              font-size: 1.1em;
+            }
+            .content {
+              padding: 40px 30px;
+            }
+            .budget-info { 
+              background: #f8f9ff;
+              border-radius: 10px;
+              padding: 25px;
+              margin-bottom: 30px;
+              border-left: 5px solid #667eea;
+            }
+            .budget-info h2 {
+              color: #667eea;
+              margin-top: 0;
+              font-size: 1.8em;
+            }
+            .info-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+              gap: 15px;
+              margin-top: 20px;
+            }
+            .info-item {
+              background: white;
+              padding: 15px;
+              border-radius: 8px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            }
+            .info-label {
+              font-weight: bold;
+              color: #667eea;
+              font-size: 0.9em;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            }
+            .info-value {
+              margin-top: 5px;
+              font-size: 1.1em;
+            }
+            table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin-bottom: 30px;
+              border-radius: 10px;
+              overflow: hidden;
+              box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            }
+            th { 
+              background: linear-gradient(135deg, #667eea, #764ba2);
+              color: white;
+              padding: 20px;
+              text-align: left;
+              font-weight: 600;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              font-size: 0.9em;
+            }
+            td { 
+              padding: 18px 20px;
+              border-bottom: 1px solid #eee;
+              vertical-align: middle;
+            }
+            tr:nth-child(even) { 
+              background-color: #f8f9ff; 
+            }
+            tr:hover {
+              background-color: #f0f2ff;
+              transition: background-color 0.3s ease;
+            }
+            .total-section { 
+              background: linear-gradient(135deg, #f8f9ff, #e8edff);
+              border-radius: 15px;
+              padding: 30px;
+              text-align: right;
+              border: 2px solid #e0e7ff;
+            }
+            .total-item {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin: 15px 0;
+              font-size: 1.2em;
+            }
+            .total-label {
+              font-weight: 600;
+              color: #667eea;
+            }
+            .total-value {
+              font-weight: bold;
+              color: #333;
+            }
+            .grand-total {
+              border-top: 3px solid #667eea;
+              padding-top: 20px;
+              margin-top: 20px;
+            }
+            .grand-total .total-value {
+              font-size: 1.4em;
+              color: #667eea;
+            }
+            .footer {
+              background: #f8f9ff;
+              padding: 20px 30px;
+              text-align: center;
+              color: #666;
+              font-style: italic;
+            }
+            @media print { 
+              body { 
+                background: white !important;
+                padding: 0 !important;
+              }
+              .container {
+                box-shadow: none !important;
+                border-radius: 0 !important;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
             <div class="header">
-              <div class="logo">${companyData.name}</div>
-              <div class="subtitle">Sistema de Vendas - Qualidade e Preço Baixo</div>
+              <h1>${companyData.name}</h1>
+              <p>CNPJ: ${companyData.cnpj}</p>
+              <p>📧 ${companyData.email} | 📱 ${companyData.phone}</p>
+              <p>📍 ${companyData.address}</p>
             </div>
             
-            <div class="company-info">
-              <h3>Dados da Empresa</h3>
-              <div class="info-row"><strong>CNPJ:</strong> ${companyData.cnpj}</div>
-              <div class="info-row"><strong>Email:</strong> ${companyData.email}</div>
-              <div class="info-row"><strong>Telefone/WhatsApp:</strong> ${companyData.phone}</div>
-              <div class="info-row"><strong>Endereço:</strong> ${companyData.address}</div>
-            </div>
-            
-            <h2>Orçamento #${budget.id}</h2>
-            
-            <div class="client-info">
-              <h3>Dados do Cliente</h3>
-              <div class="info-row"><strong>Nome:</strong> ${budget.customerName}</div>
-              <div class="info-row"><strong>${budget.customerType === 'pessoa_fisica' ? 'CPF' : 'CNPJ'}:</strong> ${budget.customerDocument}</div>
-              <div class="info-row"><strong>Telefone:</strong> ${budget.customerPhone}</div>
-              <div class="info-row"><strong>Endereço:</strong> ${budget.customerAddress}</div>
-              <div class="info-row"><strong>Data:</strong> ${new Date(budget.date).toLocaleDateString('pt-BR')}</div>
-              <div class="info-row"><strong>Válido até:</strong> ${new Date(budget.validUntil).toLocaleDateString('pt-BR')}</div>
-            </div>
-            
-            <div class="products">
-              <h3>Produtos:</h3>
-              ${budget.products.map(product => `
-                <div class="product-item">
-                  <span>${product.name} (${product.quantity}x R$ ${product.price.toFixed(2)})</span>
-                  <span>R$ ${(product.quantity * product.price).toFixed(2)}</span>
+            <div class="content">
+              <div class="budget-info">
+                <h2>💼 Orçamento #${budget.id}</h2>
+                <div class="info-grid">
+                  <div class="info-item">
+                    <div class="info-label">Data</div>
+                    <div class="info-value">${new Date(budget.date).toLocaleDateString('pt-BR')}</div>
+                  </div>
+                  <div class="info-item">
+                    <div class="info-label">Cliente</div>
+                    <div class="info-value">${budget.customerName}</div>
+                  </div>
+                  <div class="info-item">
+                    <div class="info-label">Telefone</div>
+                    <div class="info-value">${budget.customerPhone || 'Não informado'}</div>
+                  </div>
+                  <div class="info-item">
+                    <div class="info-label">Status</div>
+                    <div class="info-value">${budget.status}</div>
+                  </div>
                 </div>
-              `).join('')}
-            </div>
-            
-            <div class="total">
-              <p>Total: R$ ${budget.total.toFixed(2)}</p>
+              </div>
+              
+              <table>
+                <thead>
+                  <tr>
+                    <th>📦 Produto</th>
+                    <th>📊 Quantidade</th>
+                    <th>💰 Valor Unitário</th>
+                    <th>💵 Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${budget.products.map(item => `
+                    <tr>
+                      <td><strong>${item.name}</strong></td>
+                      <td>${item.quantity}</td>
+                      <td>R$ ${item.price.toFixed(2)}</td>
+                      <td><strong>R$ ${(item.quantity * item.price).toFixed(2)}</strong></td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+              
+              <div class="total-section">
+                <div class="total-item">
+                  <span class="total-label">💼 Subtotal:</span>
+                  <span class="total-value">${formatCurrency(budget.total)}</span>
+                </div>
+                <div class="total-item">
+                  <span class="total-label">📈 Lucro Estimado:</span>
+                  <span class="total-value">${formatCurrency(budget.profit)}</span>
+                </div>
+                <div class="total-item grand-total">
+                  <span class="total-label">🎯 TOTAL GERAL:</span>
+                  <span class="total-value">${formatCurrency(budget.total)}</span>
+                </div>
+              </div>
             </div>
             
             <div class="footer">
-              <p>${companyData.name} - Qualidade e Preço Baixo</p>
-              <p>Este orçamento é válido até ${new Date(budget.validUntil).toLocaleDateString('pt-BR')}</p>
-              <p>Email: ${companyData.email} | Telefone/WhatsApp: ${companyData.phone}</p>
+              <p>Orçamento válido por 30 dias. Obrigado pela preferência! 🙏</p>
             </div>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.print();
-    }
+          </div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.print();
   };
 
   const formatCurrency = (value: number) => `R$ ${value.toFixed(2)}`;

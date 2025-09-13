@@ -19,7 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Package, Plus, Minus, TrendingUp, TrendingDown } from "lucide-react";
-import { Product } from "@/components/sales/types";
+import { Product, Sale } from "@/components/sales/types";
 
 interface StockMovement {
   id: number;
@@ -34,9 +34,10 @@ interface StockMovement {
 interface StockManagementProps {
   products: Product[];
   setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
+  sales?: Sale[];
 }
 
-export function StockManagement({ products, setProducts }: StockManagementProps) {
+export function StockManagement({ products, setProducts, sales = [] }: StockManagementProps) {
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [isEntryDialogOpen, setIsEntryDialogOpen] = useState(false);
   const [isExitDialogOpen, setIsExitDialogOpen] = useState(false);
@@ -131,6 +132,54 @@ export function StockManagement({ products, setProducts }: StockManagementProps)
     setIsExitDialogOpen(false);
   };
 
+  // Função para importar saídas das vendas
+  const importSalesData = () => {
+    if (!sales.length) {
+      alert("Nenhuma venda encontrada para importar!");
+      return;
+    }
+
+    let importedMovements = 0;
+    const today = new Date().toISOString().split("T")[0];
+
+    sales.forEach(sale => {
+      sale.products.forEach(saleProduct => {
+        const product = products.find(p => p.name === saleProduct.name);
+        if (product) {
+          // Criar movimento de saída baseado na venda
+          const movement: StockMovement = {
+            id: Date.now() + Math.random(),
+            productId: product.id,
+            productName: product.name,
+            type: "saida",
+            quantity: saleProduct.quantity,
+            date: sale.date,
+            reason: `Venda #${sale.id} - ${sale.customer?.name || 'Cliente'}`
+          };
+
+          setMovements(prev => {
+            // Verificar se já existe movimento para esta venda
+            const exists = prev.some(m => m.reason.includes(`Venda #${sale.id}`));
+            if (!exists) {
+              importedMovements++;
+              return [movement, ...prev];
+            }
+            return prev;
+          });
+
+          // Atualizar estoque do produto
+          setProducts(prev => prev.map(p => 
+            p.id === product.id 
+              ? { ...p, stock: Math.max(0, p.stock - saleProduct.quantity) }
+              : p
+          ));
+        }
+      });
+    });
+
+    alert(`${importedMovements} movimentos de saída importados das vendas!`);
+  };
+
   const getTotalMovements = (type: "entrada" | "saida") => {
     return movements.filter(m => m.type === type).reduce((sum, m) => sum + m.quantity, 0);
   };
@@ -141,6 +190,15 @@ export function StockManagement({ products, setProducts }: StockManagementProps)
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold tracking-tight">Controle de Estoque</h2>
         <div className="flex space-x-2">
+          <Button 
+            onClick={importSalesData}
+            variant="secondary" 
+            className="flex items-center space-x-2"
+          >
+            <TrendingDown className="w-4 h-4" />
+            <span>Importar Vendas</span>
+          </Button>
+          
           <Dialog open={isEntryDialogOpen} onOpenChange={setIsEntryDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="default" className="flex items-center space-x-2">

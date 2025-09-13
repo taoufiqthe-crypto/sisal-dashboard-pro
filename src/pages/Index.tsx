@@ -102,6 +102,7 @@ const Index = () => {
           <StockManagement
             products={products}
             setProducts={setProducts}
+            sales={[]}
           />
         );
       case "customers":

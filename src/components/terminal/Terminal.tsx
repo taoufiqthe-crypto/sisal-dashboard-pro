@@ -34,29 +34,59 @@ export function Terminal() {
       type: 'success'
     };
 
-    switch (cmd.toLowerCase().trim()) {
-      case 'help':
-        newEntry.output = "Comandos disponíveis:\n- help: Mostra esta ajuda\n- status: Status do sistema\n- vendas: Resumo de vendas\n- produtos: Lista produtos em estoque baixo\n- clear: Limpa o terminal";
-        newEntry.type = 'info';
-        break;
-      case 'status':
-        newEntry.output = "✅ Sistema online\n✅ Banco de dados conectado\n✅ Última sincronização: " + new Date().toLocaleString();
-        newEntry.type = 'success';
-        break;
-      case 'vendas':
-        newEntry.output = "📊 Resumo de Vendas (Hoje):\n- Total: R$ 1.250,00\n- Transações: 15\n- Ticket médio: R$ 83,33";
-        newEntry.type = 'info';
-        break;
-      case 'produtos':
-        newEntry.output = "⚠️ Produtos com estoque baixo:\n- Rebites: 5 unidades\n- Molduras: 8 unidades\n- Tabicas: 12 unidades";
-        newEntry.type = 'error';
-        break;
-      case 'clear':
-        setHistory([]);
-        return;
-      default:
-        newEntry.output = `Comando não reconhecido: ${cmd}\nDigite 'help' para ver os comandos disponíveis.`;
-        newEntry.type = 'error';
+    // Comandos do GitHub
+    if (cmd.toLowerCase().startsWith('git ')) {
+      const gitCmd = cmd.toLowerCase().slice(4);
+      switch (gitCmd) {
+        case 'status':
+          newEntry.output = "🔄 Git Status:\n✅ Branch: main\n✅ Commits ahead: 0\n✅ Working directory clean\n📁 Remote: origin/main";
+          newEntry.type = 'success';
+          break;
+        case 'log':
+          newEntry.output = "📝 Commit History:\n• feat: Adicionar sistema de orçamentos\n• fix: Corrigir navegação entre abas\n• feat: Implementar controle de estoque\n• initial: Commit inicial do projeto";
+          newEntry.type = 'info';
+          break;
+        case 'branch':
+          newEntry.output = "🌿 Branches:\n* main\n  feature/stock-management\n  feature/budget-system";
+          newEntry.type = 'info';
+          break;
+        case 'pull':
+          newEntry.output = "⬇️ Git Pull executado:\nAlready up to date.\nBranch 'main' está sincronizada com 'origin/main'";
+          newEntry.type = 'success';
+          break;
+        case 'push':
+          newEntry.output = "⬆️ Git Push executado:\nEnumerating objects: 15, done.\nCounting objects: 100%\nWriting objects: 100%\nTotal 15 (delta 8), reused 0 (delta 0)\nTo origin main\n   a1b2c3d..e4f5g6h  main -> main";
+          newEntry.type = 'success';
+          break;
+        default:
+          newEntry.output = `Git: comando '${gitCmd}' não reconhecido.\nComandos Git disponíveis:\n- git status\n- git log\n- git branch\n- git pull\n- git push`;
+          newEntry.type = 'error';
+      }
+    } else {
+      switch (cmd.toLowerCase().trim()) {
+        case 'help':
+          newEntry.output = "Comandos disponíveis:\n- help: Mostra esta ajuda\n- status: Status do sistema\n- vendas: Resumo de vendas\n- produtos: Lista produtos em estoque baixo\n- git <comando>: Comandos Git (status, log, branch, pull, push)\n- clear: Limpa o terminal";
+          newEntry.type = 'info';
+          break;
+        case 'status':
+          newEntry.output = "✅ Sistema online\n✅ Banco de dados conectado\n✅ Última sincronização: " + new Date().toLocaleString() + "\n🔗 Git conectado\n📊 Vendas: Ativas\n📦 Estoque: Monitorado";
+          newEntry.type = 'success';
+          break;
+        case 'vendas':
+          newEntry.output = "📊 Resumo de Vendas (Hoje):\n- Total: R$ 1.250,00\n- Transações: 15\n- Ticket médio: R$ 83,33\n- Orçamentos: 8 pendentes\n- Taxa conversão: 65%";
+          newEntry.type = 'info';
+          break;
+        case 'produtos':
+          newEntry.output = "⚠️ Produtos com estoque baixo:\n- Rebites: 5 unidades (crítico)\n- Molduras: 8 unidades (atenção)\n- Tabicas: 12 unidades (baixo)\n📈 Recomendação: Reposição urgente";
+          newEntry.type = 'error';
+          break;
+        case 'clear':
+          setHistory([]);
+          return;
+        default:
+          newEntry.output = `Comando não reconhecido: ${cmd}\nDigite 'help' para ver os comandos disponíveis.\nPara comandos Git, use: git <comando>`;
+          newEntry.type = 'error';
+      }
     }
 
     setHistory(prev => [...prev, newEntry]);
