@@ -31,11 +31,9 @@ import {
   CreditCard,
   Banknote,
   Smartphone,
-  Printer,
 } from "lucide-react";
 
 import { Product, Sale, SaleItem, Customer, paymentMethods } from "./types";
-import ReceiptPrinter from "./ReceiptPrinter";
 
 interface PDVInterfaceProps {
   products: Product[];
@@ -57,7 +55,6 @@ export function PDVInterface({
   const [paymentMethod, setPaymentMethod] = useState<"dinheiro" | "pix" | "credito" | "debito">("dinheiro");
   const [amountPaid, setAmountPaid] = useState("");
   const [discount, setDiscount] = useState(0);
-  const [discountType, setDiscountType] = useState<"reais" | "percent">("reais");
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showReceiptDialog, setShowReceiptDialog] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
@@ -114,7 +111,6 @@ export function PDVInterface({
     setCart([]);
     setSelectedCustomer(null);
     setDiscount(0);
-    setDiscountType("reais");
     setAmountPaid("");
   };
 
@@ -124,23 +120,7 @@ export function PDVInterface({
 
   const calculateTotal = () => {
     const subtotal = calculateSubtotal();
-    let discountAmount = 0;
-    
-    if (discountType === "percent") {
-      discountAmount = (subtotal * discount) / 100;
-    } else {
-      discountAmount = discount;
-    }
-    
-    return Math.max(0, subtotal - discountAmount);
-  };
-
-  const getDiscountAmount = () => {
-    const subtotal = calculateSubtotal();
-    if (discountType === "percent") {
-      return (subtotal * discount) / 100;
-    }
-    return discount;
+    return subtotal - discount;
   };
 
   const calculateChange = () => {
@@ -369,25 +349,14 @@ export function PDVInterface({
             {/* Desconto */}
             <div className="mb-4">
               <Label className="text-sm font-medium">Desconto</Label>
-              <div className="flex gap-2 mt-1">
-                <Select value={discountType} onValueChange={(value: "reais" | "percent") => setDiscountType(value)}>
-                  <SelectTrigger className="w-20">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="reais">R$</SelectItem>
-                    <SelectItem value="percent">%</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={discount}
-                  onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
-                  placeholder="0.00"
-                  className="flex-1"
-                />
-              </div>
+              <Input
+                type="number"
+                step="0.01"
+                value={discount}
+                onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+                placeholder="0.00"
+                className="mt-1"
+              />
             </div>
 
             <div className="space-y-2 mb-4">
@@ -397,8 +366,8 @@ export function PDVInterface({
               </div>
               {discount > 0 && (
                 <div className="flex justify-between text-green-600">
-                  <span>Desconto ({discountType === "percent" ? `${discount}%` : "R$"}):</span>
-                  <span>-{formatCurrency(getDiscountAmount())}</span>
+                  <span>Desconto:</span>
+                  <span>-{formatCurrency(discount)}</span>
                 </div>
               )}
               <div className="flex justify-between text-lg font-bold">
@@ -414,7 +383,7 @@ export function PDVInterface({
                 disabled={cart.length === 0}
               >
                 <Receipt className="w-4 h-4 mr-2" />
-                Finalizar e Imprimir
+                Finalizar Venda
               </Button>
               <Button
                 variant="outline"
@@ -504,46 +473,37 @@ export function PDVInterface({
         </DialogContent>
       </Dialog>
 
-      {/* Dialog de Recibo */}
+      {/* Dialog de Comprovante */}
       <Dialog open={showReceiptDialog} onOpenChange={setShowReceiptDialog}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Printer className="w-5 h-5" />
-              Venda Finalizada
-            </DialogTitle>
+            <DialogTitle>Venda Finalizada</DialogTitle>
           </DialogHeader>
           
           {lastSale && (
             <div className="space-y-4">
-              <ReceiptPrinter sale={lastSale} />
-              
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="font-semibold text-green-800">Venda realizada com sucesso!</span>
+              <div className="text-center">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Receipt className="w-8 h-8 text-green-600" />
                 </div>
-                
-                <div className="space-y-1 text-sm text-green-700">
-                  <div className="flex justify-between">
-                    <span>Total:</span>
-                    <span className="font-semibold">{formatCurrency(lastSale.total)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Pagamento:</span>
-                    <span>{lastSale.paymentMethod.toUpperCase()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Valor pago:</span>
-                    <span>{formatCurrency(lastSale.amountPaid)}</span>
-                  </div>
-                  {lastSale.change > 0 && (
-                    <div className="flex justify-between">
-                      <span>Troco:</span>
-                      <span className="font-semibold">{formatCurrency(lastSale.change)}</span>
-                    </div>
-                  )}
+                <h3 className="text-lg font-semibold text-green-800">Venda realizada com sucesso!</h3>
+              </div>
+
+              <div className="bg-muted p-4 rounded-lg space-y-2">
+                <div className="flex justify-between">
+                  <span>Total:</span>
+                  <span className="font-semibold">{formatCurrency(lastSale.total)}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span>Pagamento:</span>
+                  <span>{paymentMethods.find(m => m.type === lastSale.paymentMethod)?.label}</span>
+                </div>
+                {lastSale.change > 0 && (
+                  <div className="flex justify-between">
+                    <span>Troco:</span>
+                    <span className="font-semibold">{formatCurrency(lastSale.change)}</span>
+                  </div>
+                )}
               </div>
 
               <Button

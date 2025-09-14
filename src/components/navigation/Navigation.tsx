@@ -12,10 +12,7 @@ import {
   Cog,
   User,
   Warehouse,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
-import { useState } from "react";
 
 interface NavigationProps {
   activeTab: string;
@@ -37,81 +34,57 @@ const navigationItems = [
 ];
 
 export function Navigation({ activeTab, onTabChange }: NavigationProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-
   return (
-    <div className={cn(
-      "fixed left-0 top-0 h-full bg-card border-r border-border transition-all duration-300 z-50",
-      isCollapsed ? "w-16" : "w-64"
-    )}>
-      {/* Header */}
-      <div className="p-4 border-b border-border">
-        <div className="flex items-center justify-between">
-          {!isCollapsed && (
+    <div className="border-b border-border bg-card">
+      <div className="container mx-auto px-4">
+        <div className="flex items-center justify-between py-2">
+          {/* Grupo da Esquerda (Logo e Navegação) */}
+          <div className="flex items-center space-x-6">
+            {/* Logo e Título */}
             <div className="flex items-center space-x-3">
               <img
                 src="/lovable-uploads/gesso.png"
-                alt="Gesso Primus"
-                className="w-8 h-8 object-contain"
+                alt="Gesso Primus - Qualidade e Preço Baixo"
+                className="w-10 h-10 object-contain"
               />
               <div>
-                <h1 className="text-lg font-bold text-green-500">Gesso Primus</h1>
+                <h1 className="text-xl font-bold text-green-500">Gesso Primus</h1>
                 <p className="text-xs text-muted-foreground">Sistema de Vendas</p>
               </div>
             </div>
-          )}
+
+            {/* Botões de Navegação */}
+            <div className="flex items-center space-x-2">
+              {navigationItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Button
+                    key={item.id}
+                    variant={activeTab === item.id ? "default" : "ghost"}
+                    className={cn(
+                      "flex items-center space-x-2 transition-all",
+                      activeTab === item.id && "bg-primary text-primary-foreground"
+                    )}
+                    onClick={() => onTabChange(item.id)}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span>{item.label}</span>
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Botão de Nova Venda (Grupo da Direita) */}
           <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-2"
+            variant="default"
+            className="flex items-center space-x-2"
+            onClick={() => onTabChange("sales")}
           >
-            {isCollapsed ? (
-              <ChevronRight className="w-4 h-4" />
-            ) : (
-              <ChevronLeft className="w-4 h-4" />
-            )}
+            <PlusCircle className="w-4 h-4" />
+            <span>Nova Venda</span>
           </Button>
         </div>
-      </div>
-
-      {/* Navigation Items */}
-      <div className="flex flex-col p-2 space-y-1 overflow-y-auto h-[calc(100vh-120px)]">
-        {navigationItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <Button
-              key={item.id}
-              variant={activeTab === item.id ? "default" : "ghost"}
-              className={cn(
-                "justify-start transition-all",
-                isCollapsed ? "px-2" : "px-3",
-                activeTab === item.id && "bg-primary text-primary-foreground"
-              )}
-              onClick={() => onTabChange(item.id)}
-            >
-              <Icon className="w-4 h-4 flex-shrink-0" />
-              {!isCollapsed && (
-                <span className="ml-3 truncate">{item.label}</span>
-              )}
-            </Button>
-          );
-        })}
-      </div>
-
-      {/* Footer - Nova Venda Button */}
-      <div className="absolute bottom-0 left-0 right-0 p-2 border-t border-border bg-card">
-        <Button
-          variant="default"
-          className={cn(
-            "w-full justify-start",
-            isCollapsed ? "px-2" : "px-3"
-          )}
-          onClick={() => onTabChange("sales")}
-        >
-          <PlusCircle className="w-4 h-4 flex-shrink-0" />
-          {!isCollapsed && <span className="ml-3">Nova Venda</span>}
-        </Button>
       </div>
     </div>
   );
