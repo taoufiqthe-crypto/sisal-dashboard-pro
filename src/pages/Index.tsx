@@ -1,5 +1,7 @@
-// src/pages/Index.tsx
 import { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Navigate } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import { Navigation } from "@/components/navigation/Navigation";
 import { Dashboard } from "@/components/dashboard/Dashboard";
 import { ProductManagement } from "@/components/products/ProductManagement";
@@ -12,6 +14,9 @@ import { Manufacturing } from "@/components/Manufacturing/Manufacturing";
 import { Terminal } from "@/components/terminal/Terminal";
 import { BudgetManagement } from "@/components/budget/BudgetManagement";
 import { CustomerManagement } from "@/components/customers/CustomerManagement";
+import { BackupRestore } from "@/components/backup/BackupRestore";
+import { FinancialManagement } from "@/components/financial/FinancialManagement";
+import { AdvancedStockManagement } from "@/components/advanced-stock/AdvancedStockManagement";
 
 // ✅ importamos os mocks e tipos
 import { mockProducts, Product, mockCustomers, Customer } from "@/components/sales";
@@ -40,6 +45,7 @@ const loadCustomersFromLocalStorage = (): Customer[] => {
 };
 
 const Index = () => {
+  const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
 
   // Produtos
@@ -47,6 +53,18 @@ const Index = () => {
 
   // Clientes
   const [customers, setCustomers] = useState<Customer[]>(loadCustomersFromLocalStorage);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
 
   // Persistência
   useEffect(() => {
@@ -73,8 +91,27 @@ const Index = () => {
     setProducts((prevProducts) => [...prevProducts, productWithId]);
   };
 
-  const handleSaleCreated = (budgetItems: any[]) => {
-    console.log("Venda criada a partir do orçamento:", budgetItems);
+  const handleSaleCreated = (newSale: any) => {
+    console.log("Venda criada:", newSale);
+    
+    // Atualizar estoque automaticamente
+    if (newSale.products && Array.isArray(newSale.products)) {
+      setProducts(prevProducts => 
+        prevProducts.map(product => {
+          const saleProduct = newSale.products.find((p: any) => 
+            p.name === product.name || p.productName === product.name
+          );
+          
+          if (saleProduct) {
+            const newStock = Math.max(0, product.stock - saleProduct.quantity);
+            console.log(`Atualizando estoque de ${product.name}: ${product.stock} -> ${newStock}`);
+            return { ...product, stock: newStock };
+          }
+          
+          return product;
+        })
+      );
+    }
   };
 
   // Renderização
@@ -93,8 +130,10 @@ const Index = () => {
         return (
           <SalesManagement
             products={products}
+            setProducts={setProducts}
             customers={customers}
             setCustomers={setCustomers}
+            onSaleCreated={handleSaleCreated}
           />
         );
       case "stock":
@@ -127,6 +166,12 @@ const Index = () => {
         return <Manufacturing onTabChange={setActiveTab} />;
       case "terminal":
         return <Terminal />;
+      case "backup":
+        return <BackupRestore />;
+      case "financial":
+        return <FinancialManagement />;
+      case "advanced-stock":
+        return <AdvancedStockManagement />;
       case "settings":
         return <Settings onProductAdded={handleProductAdded} />;
       default:
