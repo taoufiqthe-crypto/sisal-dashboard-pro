@@ -118,6 +118,7 @@ export function NewSale({
         quantity: item.quantity,
         price: item.price,
       })),
+      cart: selectedProducts, // Adicionando os produtos selecionados para facilitar a atualização do estoque
       total,
       profit,
       paymentMethod: selectedPaymentMethod,

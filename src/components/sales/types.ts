@@ -37,6 +37,7 @@ export interface Sale {
     quantity: number;
     price: number;
   }>;
+  cart?: SaleItem[]; // Adicionado para facilitar atualização do estoque
   total: number;
   profit: number;
   paymentMethod: "dinheiro" | "pix" | "credito" | "debito";

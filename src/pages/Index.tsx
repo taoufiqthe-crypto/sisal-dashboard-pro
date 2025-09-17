@@ -14,6 +14,7 @@ import { Manufacturing } from "@/components/Manufacturing/Manufacturing";
 import { Terminal } from "@/components/terminal/Terminal";
 import { BudgetManagement } from "@/components/budget/BudgetManagement";
 import { CustomerManagement } from "@/components/customers/CustomerManagement";
+import { SupplierManagement } from "@/components/suppliers/SupplierManagement";
 import { BackupRestore } from "@/components/backup/BackupRestore";
 import { FinancialManagement } from "@/components/financial/FinancialManagement";
 import { AdvancedStockManagement } from "@/components/advanced-stock/AdvancedStockManagement";
@@ -94,12 +95,17 @@ const Index = () => {
   const handleSaleCreated = (newSale: any) => {
     console.log("Venda criada:", newSale);
     
-    // Atualizar estoque automaticamente
-    if (newSale.products && Array.isArray(newSale.products)) {
+    // Atualizar estoque automaticamente baseado no carrinho ou produtos da venda
+    const productsToUpdate = newSale.cart || newSale.products || [];
+    
+    if (productsToUpdate && Array.isArray(productsToUpdate)) {
       setProducts(prevProducts => 
         prevProducts.map(product => {
-          const saleProduct = newSale.products.find((p: any) => 
-            p.name === product.name || p.productName === product.name
+          // Procurar produto tanto por ID quanto por nome
+          const saleProduct = productsToUpdate.find((p: any) => 
+            p.productId === product.id || 
+            p.name === product.name || 
+            p.productName === product.name
           );
           
           if (saleProduct) {
@@ -151,6 +157,8 @@ const Index = () => {
             setCustomers={setCustomers}
           />
         );
+      case "suppliers":
+        return <SupplierManagement />;
       case "budget":
         return (
           <BudgetManagement
