@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { NewSale } from "./NewSale";
 import { PDVInterface } from "./PDVInterface";
+import { ModernPDV } from "./ModernPDV";
 import { SalesToday } from "./SalesToday";
 import { SalesMonth } from "./SalesMonth";
 import { SalesYear } from "./SalesYear";
@@ -25,15 +26,21 @@ import {
   Customer,
 } from "./types";
 
-export function SalesManagement({
-  products,
-  customers,
-  setCustomers,
-}: {
+interface SalesManagementProps {
   products: Product[];
+  setProducts?: React.Dispatch<React.SetStateAction<Product[]>>;
   customers: Customer[];
   setCustomers: React.Dispatch<React.SetStateAction<Customer[]>>;
-}) {
+  onSaleCreated?: (sale: Sale) => void;
+}
+
+export function SalesManagement({
+  products,
+  setProducts,
+  customers,
+  setCustomers,
+  onSaleCreated,
+}: SalesManagementProps) {
   const [sales, setSales] = useState<Sale[]>(mockSales);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -47,9 +54,7 @@ export function SalesManagement({
   const isThisMonth = (date: string) => {
     const d = new Date(date);
     const now = new Date();
-    return (
-      d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-    );
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   };
 
   const isThisYear = (date: string) => {
@@ -60,27 +65,47 @@ export function SalesManagement({
 
   const handleSaleCreated = (newSale: Sale) => {
     setSales([newSale, ...sales]);
+    
+    // Atualizar estoque automaticamente
+    if (setProducts && newSale.products) {
+      setProducts(prevProducts => 
+        prevProducts.map(product => {
+          const saleProduct = newSale.products.find((p: any) => 
+            p.name === product.name || p.productName === product.name
+          );
+          
+          if (saleProduct) {
+            const newStock = Math.max(0, product.stock - saleProduct.quantity);
+            return { ...product, stock: newStock };
+          }
+          
+          return product;
+        })
+      );
+    }
+    
+    // Chamar callback se fornecido
+    if (onSaleCreated) {
+      onSaleCreated(newSale);
+    }
   };
 
   return (
     <div className="space-y-6">
       <Tabs defaultValue="pdv" className="w-full">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-3xl font-bold tracking-tight">Vendas</h2>
-          <TabsList className="grid w-fit grid-cols-2">
-            <TabsTrigger value="pdv" className="flex items-center gap-2">
-              <Monitor className="w-4 h-4" />
-              PDV
-            </TabsTrigger>
-            <TabsTrigger value="reports" className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4" />
-              Relatórios
-            </TabsTrigger>
-          </TabsList>
-        </div>
-
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="pdv" className="flex items-center gap-2">
+            <Monitor className="w-4 h-4" />
+            PDV Moderno
+          </TabsTrigger>
+          <TabsTrigger value="reports" className="flex items-center gap-2">
+            <BarChart3 className="w-4 h-4" />
+            Relatórios de Vendas
+          </TabsTrigger>
+        </TabsList>
+        
         <TabsContent value="pdv" className="mt-0">
-          <PDVInterface
+          <ModernPDV
             products={products}
             customers={customers}
             setCustomers={setCustomers}
@@ -91,17 +116,20 @@ export function SalesManagement({
         <TabsContent value="reports" className="space-y-6">
           {/* Cabeçalho dos Relatórios */}
           <div className="flex items-center justify-between">
-            <h3 className="text-xl font-semibold">Relatórios de Vendas</h3>
+            <div>
+              <h2 className="text-2xl font-bold">Relatórios de Vendas</h2>
+              <p className="text-muted-foreground">Acompanhe o desempenho das suas vendas</p>
+            </div>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="default" className="flex items-center space-x-2">
-                  <PlusCircle className="w-4 h-4" />
-                  <span>Nova Venda</span>
+                <Button>
+                  <PlusCircle className="w-4 h-4 mr-2" />
+                  Nova Venda Manual
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px]">
+              <DialogContent className="max-w-4xl">
                 <DialogHeader>
-                  <DialogTitle>Registrar Nova Venda</DialogTitle>
+                  <DialogTitle>Nova Venda Manual</DialogTitle>
                 </DialogHeader>
                 <NewSale
                   products={products}
@@ -114,31 +142,27 @@ export function SalesManagement({
             </Dialog>
           </div>
 
-          {/* Vendas do Dia */}
-          <SalesToday
-            sales={sales}
-            paymentMethods={paymentMethods}
-            formatCurrency={formatCurrency}
-            isToday={isToday}
-          />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <SalesToday 
+              sales={sales.filter(sale => isToday(sale.date))} 
+              paymentMethods={paymentMethods}
+              formatCurrency={formatCurrency}
+              isToday={isToday}
+            />
+            <SalesMonth 
+              sales={sales.filter(sale => isThisMonth(sale.date))} 
+              paymentMethods={paymentMethods}
+              formatCurrency={formatCurrency}
+              isThisMonth={isThisMonth}
+            />
+            <SalesYear 
+              sales={sales.filter(sale => isThisYear(sale.date))} 
+              paymentMethods={paymentMethods}
+              formatCurrency={formatCurrency}
+              isThisYear={isThisYear}
+            />
+          </div>
 
-          {/* Vendas do Mês */}
-          <SalesMonth
-            sales={sales}
-            paymentMethods={paymentMethods}
-            formatCurrency={formatCurrency}
-            isThisMonth={isThisMonth}
-          />
-
-          {/* Vendas do Ano */}
-          <SalesYear
-            sales={sales}
-            paymentMethods={paymentMethods}
-            formatCurrency={formatCurrency}
-            isThisYear={isThisYear}
-          />
-
-          {/* Histórico */}
           <SalesHistory sales={sales} formatCurrency={formatCurrency} />
         </TabsContent>
       </Tabs>

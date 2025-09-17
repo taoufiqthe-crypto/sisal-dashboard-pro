@@ -5,6 +5,9 @@ export interface Product {
   cost: number;
   stock: number;
   category: string;
+  description?: string;
+  barcode?: string;
+  image?: string;
 }
 
 export interface SaleItem {
@@ -19,6 +22,11 @@ export interface Customer {
   name: string;
   phone?: string;
   email?: string;
+  document?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
 }
 
 export interface Sale {
@@ -35,7 +43,42 @@ export interface Sale {
   amountPaid: number;
   change: number;
   status: "pago" | "pendente";
-  customer: Customer; // 👈 agora cliente é um objeto completo
+  customer: Customer;
+}
+
+export interface Budget {
+  id: number;
+  date: string;
+  budgetNumber: string;
+  deliveryDate?: string;
+  products: Array<{
+    name: string;
+    quantity: number;
+    unit: string;
+    price: number;
+    subtotal: number;
+  }>;
+  subtotal: number;
+  discount: number;
+  total: number;
+  customer: {
+    name: string;
+    document: string;
+    address?: string;
+    city?: string;
+    phone?: string;
+  };
+  company: {
+    name: string;
+    document: string;
+    address: string;
+    phone: string;
+    email: string;
+  };
+  paymentMethod?: string;
+  observations?: string;
+  status: 'orcamento' | 'aprovado' | 'rejeitado' | 'vendido';
+  validUntil: string;
 }
 
 export interface PaymentMethod {
