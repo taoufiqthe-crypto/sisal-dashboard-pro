@@ -132,52 +132,95 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
     setIsExitDialogOpen(false);
   };
 
-  // Função para importar saídas das vendas
-  const importSalesData = () => {
+  // Função para calcular estoque baseado em entradas e saídas
+  const calculateStock = () => {
     if (!sales.length) {
-      alert("Nenhuma venda encontrada para importar!");
+      alert("Nenhuma venda encontrada para calcular!");
       return;
     }
 
-    let importedMovements = 0;
-    const today = new Date().toISOString().split("T")[0];
+    // Simular estoque inicial antes das vendas
+    let calculatedMovements = 0;
+    const stockCalculations: { [productId: number]: { entrada: number, saida: number } } = {};
 
+    // Primeiro, calcular todas as saídas das vendas
     sales.forEach(sale => {
-      sale.products.forEach(saleProduct => {
-        const product = products.find(p => p.name === saleProduct.name);
+      const saleProducts = sale.cart || sale.products || [];
+      saleProducts.forEach((saleProduct: any) => {
+        const product = products.find(p => 
+          p.name === saleProduct.name || 
+          p.name === saleProduct.productName ||
+          p.id === saleProduct.productId
+        );
+        
         if (product) {
-          // Criar movimento de saída baseado na venda
-          const movement: StockMovement = {
-            id: Date.now() + Math.random(),
-            productId: product.id,
-            productName: product.name,
-            type: "saida",
-            quantity: saleProduct.quantity,
-            date: sale.date,
-            reason: `Venda #${sale.id} - ${sale.customer?.name || 'Cliente'}`
-          };
-
-          setMovements(prev => {
-            // Verificar se já existe movimento para esta venda
-            const exists = prev.some(m => m.reason.includes(`Venda #${sale.id}`));
-            if (!exists) {
-              importedMovements++;
-              return [movement, ...prev];
-            }
-            return prev;
-          });
-
-          // Atualizar estoque do produto
-          setProducts(prev => prev.map(p => 
-            p.id === product.id 
-              ? { ...p, stock: Math.max(0, p.stock - saleProduct.quantity) }
-              : p
-          ));
+          if (!stockCalculations[product.id]) {
+            stockCalculations[product.id] = { entrada: 0, saida: 0 };
+          }
+          stockCalculations[product.id].saida += saleProduct.quantity;
+          
+          // Criar movimento de saída se não existir
+          const movementExists = movements.some(m => 
+            m.reason.includes(`Venda #${sale.id}`) && m.productId === product.id
+          );
+          
+          if (!movementExists) {
+            const movement: StockMovement = {
+              id: Date.now() + Math.random(),
+              productId: product.id,
+              productName: product.name,
+              type: "saida",
+              quantity: saleProduct.quantity,
+              date: sale.date,
+              reason: `Venda #${sale.id} - ${sale.customer?.name || 'Cliente'}`
+            };
+            
+            setMovements(prev => [movement, ...prev]);
+            calculatedMovements++;
+          }
         }
       });
     });
 
-    alert(`${importedMovements} movimentos de saída importados das vendas!`);
+    // Agora calcular quanto estoque seria necessário
+    Object.keys(stockCalculations).forEach(productIdStr => {
+      const productId = parseInt(productIdStr);
+      const product = products.find(p => p.id === productId);
+      if (product) {
+        const calc = stockCalculations[productId];
+        const currentStock = product.stock;
+        const totalSold = calc.saida;
+        const requiredStock = currentStock + totalSold;
+        
+        // Se não há estoque suficiente baseado nas vendas, sugerir entrada
+        if (currentStock < totalSold) {
+          const suggestedEntry = totalSold - currentStock + 50; // +50 como margem de segurança
+          
+          if (window.confirm(`Produto: ${product.name}\nEstoque atual: ${currentStock}\nTotal vendido: ${totalSold}\nSugerimos entrada de: ${suggestedEntry} unidades.\n\nDeseja registrar esta entrada?`)) {
+            // Registrar entrada sugerida
+            const entryMovement: StockMovement = {
+              id: Date.now() + Math.random(),
+              productId: product.id,
+              productName: product.name,
+              type: "entrada",
+              quantity: suggestedEntry,
+              date: new Date().toISOString().split("T")[0],
+              reason: "Entrada calculada automaticamente"
+            };
+            
+            setMovements(prev => [entryMovement, ...prev]);
+            setProducts(prev => prev.map(p => 
+              p.id === product.id 
+                ? { ...p, stock: p.stock + suggestedEntry }
+                : p
+            ));
+            calculatedMovements++;
+          }
+        }
+      }
+    });
+
+    alert(`✅ Cálculo concluído! ${calculatedMovements} movimentos processados.`);
   };
 
   const getTotalMovements = (type: "entrada" | "saida") => {
@@ -191,12 +234,12 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
         <h2 className="text-3xl font-bold tracking-tight">Controle de Estoque</h2>
         <div className="flex space-x-2">
           <Button 
-            onClick={importSalesData}
+            onClick={calculateStock}
             variant="secondary" 
             className="flex items-center space-x-2"
           >
             <TrendingDown className="w-4 h-4" />
-            <span>Importar Vendas</span>
+            <span>Calcular Estoque</span>
           </Button>
           
           <Dialog open={isEntryDialogOpen} onOpenChange={setIsEntryDialogOpen}>

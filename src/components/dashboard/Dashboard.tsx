@@ -6,58 +6,83 @@ import {
   Calendar,
   AlertTriangle,
   Package,
-  ShoppingCart
+  ShoppingCart,
+  Trash2
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-// Mock data - em produção seria integrado com backend
+// Sistema limpo - dados calculados dinamicamente
 const mockData = {
-  todayRevenue: "R$ 2.847,90",
-  monthRevenue: "R$ 45.680,30",
-  yearProfit: "R$ 187.320,50",
-  lowStockItems: 5,
-  todaySales: 23,
-  topProducts: [
-    { name: "Placas 60x60", sold: 45, revenue: "R$ 1.350,00" },
-    { name: "Gesso São Francisco", sold: 30, revenue: "R$ 897,00" },
-    { name: "Sisal", sold: 15, revenue: "R$ 450,00" },
-    { name: "Arame", sold: 28, revenue: "R$ 280,00" },
-  ],
-  lowStock: [
-    { name: "Rebites", quantity: 5, min: 50 },
-    { name: "Molduras", quantity: 8, min: 25 },
-    { name: "Tabicas", quantity: 12, min: 30 },
-  ]
+  todayRevenue: "R$ 0,00",
+  monthRevenue: "R$ 0,00", 
+  yearProfit: "R$ 0,00",
+  lowStockItems: 0,
+  todaySales: 0,
+  topProducts: [],
+  lowStock: []
 };
 
-export function Dashboard() {
+interface DashboardProps {
+  products?: any[];
+  sales?: any[];
+  onClearAllData?: () => void;
+}
+
+export function Dashboard({ products = [], sales = [], onClearAllData }: DashboardProps) {
+  // Calcular dados dinâmicos do sistema
+  const todayStr = new Date().toISOString().split("T")[0];
+  const todaySales = sales.filter(s => s.date === todayStr);
+  const monthSales = sales.filter(s => {
+    const saleDate = new Date(s.date);
+    const now = new Date();
+    return saleDate.getMonth() === now.getMonth() && saleDate.getFullYear() === now.getFullYear();
+  });
+  
+  const todayRevenue = todaySales.reduce((sum, sale) => sum + (sale.total || 0), 0);
+  const monthRevenue = monthSales.reduce((sum, sale) => sum + (sale.total || 0), 0);
+  const yearRevenue = sales.reduce((sum, sale) => {
+    const saleYear = new Date(sale.date).getFullYear();
+    return saleYear === new Date().getFullYear() ? sum + (sale.total || 0) : sum;
+  }, 0);
+  
+  const lowStockItems = products.filter(p => p.stock < 20);
+
   return (
     <div className="space-y-6">
+      {/* Cabeçalho */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+          <p className="text-muted-foreground">Visão geral do seu negócio</p>
+        </div>
+      </div>
+
       {/* Cards de estatísticas principais */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard
           title="Faturamento Hoje"
-          value={mockData.todayRevenue}
+          value={`R$ ${todayRevenue.toFixed(2)}`}
           icon={<DollarSign className="w-8 h-8" />}
           variant="revenue"
           trend={{ value: 12.5, label: "vs ontem" }}
         />
         <StatsCard
           title="Faturamento do Mês"
-          value={mockData.monthRevenue}
+          value={`R$ ${monthRevenue.toFixed(2)}`}
           icon={<Calendar className="w-8 h-8" />}
           variant="revenue"
           trend={{ value: 8.2, label: "vs mês anterior" }}
         />
         <StatsCard
-          title="Lucro do Ano"
-          value={mockData.yearProfit}
+          title="Faturamento do Ano"
+          value={`R$ ${yearRevenue.toFixed(2)}`}
           icon={<TrendingUp className="w-8 h-8" />}
           variant="profit"
           trend={{ value: 15.8, label: "vs ano anterior" }}
         />
         <StatsCard
           title="Produtos em Falta"
-          value={mockData.lowStockItems}
+          value={lowStockItems.length}
           icon={<AlertTriangle className="w-8 h-8" />}
           variant="warning"
         />
@@ -71,15 +96,19 @@ export function Dashboard() {
             <h3 className="text-lg font-semibold">Produtos Mais Vendidos Hoje</h3>
           </div>
           <div className="space-y-3">
-            {mockData.topProducts.map((product, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                <div>
-                  <p className="font-medium">{product.name}</p>
-                  <p className="text-sm text-muted-foreground">{product.sold} unidades</p>
+            {todaySales.length > 0 ? (
+              todaySales.slice(0, 4).map((sale, index) => (
+                <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div>
+                    <p className="font-medium">Venda #{sale.id}</p>
+                    <p className="text-sm text-muted-foreground">{sale.products?.length || 0} itens</p>
+                  </div>
+                  <p className="font-semibold text-profit">R$ {(sale.total || 0).toFixed(2)}</p>
                 </div>
-                <p className="font-semibold text-profit">{product.revenue}</p>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-muted-foreground text-center py-4">Nenhuma venda hoje</p>
+            )}
           </div>
         </Card>
 
@@ -89,18 +118,22 @@ export function Dashboard() {
             <h3 className="text-lg font-semibold">Produtos com Estoque Baixo</h3>
           </div>
           <div className="space-y-3">
-            {mockData.lowStock.map((item, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                <div>
-                  <p className="font-medium">{item.name}</p>
-                  <p className="text-sm text-muted-foreground">Mínimo: {item.min}</p>
+            {lowStockItems.length > 0 ? (
+              lowStockItems.slice(0, 4).map((item, index) => (
+                <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div>
+                    <p className="font-medium">{item.name}</p>
+                    <p className="text-sm text-muted-foreground">Mínimo: 20</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-warning">{item.stock}</p>
+                    <p className="text-xs text-muted-foreground">em estoque</p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-semibold text-warning">{item.quantity}</p>
-                  <p className="text-xs text-muted-foreground">em estoque</p>
-                </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-muted-foreground text-center py-4">Todos os produtos com estoque adequado</p>
+            )}
           </div>
         </Card>
 
@@ -110,34 +143,30 @@ export function Dashboard() {
             <h3 className="text-lg font-semibold">Vendas por Categoria</h3>
           </div>
           <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-              <div>
-                <p className="font-medium">Placas</p>
-                <p className="text-sm text-muted-foreground">45 vendas</p>
-              </div>
-              <p className="font-semibold text-profit">R$ 1.350,00</p>
-            </div>
-            <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-              <div>
-                <p className="font-medium">Gesso</p>
-                <p className="text-sm text-muted-foreground">30 vendas</p>
-              </div>
-              <p className="font-semibold text-profit">R$ 897,00</p>
-            </div>
-            <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-              <div>
-                <p className="font-medium">Sisal</p>
-                <p className="text-sm text-muted-foreground">15 vendas</p>
-              </div>
-              <p className="font-semibold text-profit">R$ 450,00</p>
-            </div>
-            <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-              <div>
-                <p className="font-medium">Arame</p>
-                <p className="text-sm text-muted-foreground">28 vendas</p>
-              </div>
-              <p className="font-semibold text-profit">R$ 280,00</p>
-            </div>
+            {sales.length > 0 ? (
+              // Calcular vendas por categoria dinamicamente
+              Object.entries(
+                sales.reduce((acc: {[key: string]: {count: number, total: number}}, sale) => {
+                  sale.products?.forEach((product: any) => {
+                    const category = product.category || 'Sem Categoria';
+                    if (!acc[category]) acc[category] = {count: 0, total: 0};
+                    acc[category].count += product.quantity || 1;
+                    acc[category].total += (product.price || 0) * (product.quantity || 1);
+                  });
+                  return acc;
+                }, {})
+              ).slice(0, 4).map(([category, data]) => (
+                <div key={category} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div>
+                    <p className="font-medium">{category}</p>
+                    <p className="text-sm text-muted-foreground">{(data as {count: number, total: number}).count} vendas</p>
+                  </div>
+                  <p className="font-semibold text-profit">R$ {(data as {count: number, total: number}).total.toFixed(2)}</p>
+                </div>
+              ))
+            ) : (
+              <p className="text-muted-foreground text-center py-4">Nenhuma venda registrada ainda</p>
+            )}
           </div>
         </Card>
       </div>
@@ -146,15 +175,15 @@ export function Dashboard() {
       <Card className="p-6 bg-gradient-to-r from-primary/10 to-profit/10 border-primary/20">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
           <div>
-            <p className="text-2xl font-bold text-primary">{mockData.todaySales}</p>
+            <p className="text-2xl font-bold text-primary">{todaySales.length}</p>
             <p className="text-sm text-muted-foreground">Vendas Hoje</p>
           </div>
           <div>
-            <p className="text-2xl font-bold text-profit">{mockData.todayRevenue}</p>
+            <p className="text-2xl font-bold text-profit">R$ {todayRevenue.toFixed(2)}</p>
             <p className="text-sm text-muted-foreground">Faturamento Hoje</p>
           </div>
           <div>
-            <p className="text-2xl font-bold text-warning">{mockData.lowStockItems}</p>
+            <p className="text-2xl font-bold text-warning">{lowStockItems.length}</p>
             <p className="text-sm text-muted-foreground">Alertas de Estoque</p>
           </div>
         </div>

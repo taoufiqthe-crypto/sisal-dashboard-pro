@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Package, Cog } from "lucide-react";
+import { PlusCircle, Package, Cog, Send } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,9 @@ import { Input } from "@/components/ui/input";
 
 interface ManufacturingProps {
   onTabChange: (tab: string) => void;
+  onProductionToStock?: (production: any) => void;
+  productions?: any[];
+  setProductions?: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
 const loadProductionsFromLocalStorage = () => {
@@ -36,9 +39,17 @@ const getPieceTotals = (productions: any[]) => {
   }, {});
 };
 
-export function Manufacturing({ onTabChange }: ManufacturingProps) {
+export function Manufacturing({ 
+  onTabChange, 
+  onProductionToStock,
+  productions: externalProductions,
+  setProductions: setExternalProductions
+}: ManufacturingProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [productions, setProductions] = useState<any[]>(loadProductionsFromLocalStorage);
+  // Usar productions externas se fornecidas, senão usar localStorage
+  const [productions, setProductions] = useState<any[]>(
+    externalProductions || loadProductionsFromLocalStorage()
+  );
   const [productionData, setProductionData] = useState({
     date: "",
     pieceName: "",
@@ -52,10 +63,14 @@ export function Manufacturing({ onTabChange }: ManufacturingProps) {
   useEffect(() => {
     try {
       localStorage.setItem("productions", JSON.stringify(productions));
+      // Atualizar productions externas se setProductions estiver disponível
+      if (setExternalProductions) {
+        setExternalProductions(productions);
+      }
     } catch (error) {
       console.error("Failed to save productions to localStorage", error);
     }
-  }, [productions]);
+  }, [productions, setExternalProductions]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -88,6 +103,14 @@ export function Manufacturing({ onTabChange }: ManufacturingProps) {
       colaborador: "",
     });
     setIsModalOpen(false);
+  };
+
+  // Função para enviar produção para estoque
+  const sendProductionToStock = (production: any) => {
+    if (onProductionToStock) {
+      onProductionToStock(production);
+      alert(`✅ Produção de ${production.quantity} ${production.pieceName} enviada para o estoque!`);
+    }
   };
 
   const totalGessoSacos = productions.reduce(
@@ -199,6 +222,18 @@ export function Manufacturing({ onTabChange }: ManufacturingProps) {
                 <p className="text-green-600 font-semibold">
                   👷 Colaborador: {prod.colaborador || "Não informado"}
                 </p>
+                {onProductionToStock && (
+                  <div className="pt-2 border-t mt-2">
+                    <Button
+                      size="sm"
+                      className="w-full"
+                      onClick={() => sendProductionToStock(prod)}
+                    >
+                      <Send className="w-4 h-4 mr-2" />
+                      Enviar para Estoque
+                    </Button>
+                  </div>
+                )}
               </div>
             </Card>
           ))

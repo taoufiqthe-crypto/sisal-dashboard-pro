@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
@@ -67,22 +67,51 @@ const Index = () => {
     return <Navigate to="/auth" replace />;
   }
 
-  // Persistência
-  useEffect(() => {
+  // Dados globais do sistema
+  const [sales, setSales] = useState<any[]>(() => {
     try {
-      localStorage.setItem("products", JSON.stringify(products));
+      const storedSales = localStorage.getItem("sales");
+      return storedSales ? JSON.parse(storedSales) : [];
     } catch (error) {
-      console.error("Failed to save products to localStorage", error);
+      console.error("Failed to load sales from localStorage", error);
+      return [];
     }
-  }, [products]);
+  });
+
+  const [productions, setProductions] = useState<any[]>(() => {
+    try {
+      const storedProductions = localStorage.getItem("productions");
+      return storedProductions ? JSON.parse(storedProductions) : [];
+    } catch (error) {
+      console.error("Failed to load productions from localStorage", error);
+      return [];
+    }
+  });
+
+  // Persistência - usando useCallback para evitar loops infinitos
+  const saveToLocalStorage = useCallback((key: string, data: any) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(data));
+    } catch (error) {
+      console.error(`Failed to save ${key} to localStorage`, error);
+    }
+  }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem("customers", JSON.stringify(customers));
-    } catch (error) {
-      console.error("Failed to save customers to localStorage", error);
-    }
-  }, [customers]);
+    saveToLocalStorage("products", products);
+  }, [products, saveToLocalStorage]);
+
+  useEffect(() => {
+    saveToLocalStorage("customers", customers);
+  }, [customers, saveToLocalStorage]);
+
+  useEffect(() => {
+    saveToLocalStorage("sales", sales);
+  }, [sales, saveToLocalStorage]);
+
+  useEffect(() => {
+    saveToLocalStorage("productions", productions);
+  }, [productions, saveToLocalStorage]);
 
   // Handlers
   const handleProductAdded = (newProduct: Product) => {
@@ -92,8 +121,23 @@ const Index = () => {
     setProducts((prevProducts) => [...prevProducts, productWithId]);
   };
 
-  const handleSaleCreated = (newSale: any) => {
+  // Função para limpar todos os dados do sistema
+  const clearAllData = () => {
+    if (window.confirm("⚠️ ATENÇÃO! Esta ação irá apagar TODOS os dados do sistema (produtos, vendas, clientes, estoque, produção). Esta ação NÃO pode ser desfeita. Tem certeza?")) {
+      localStorage.clear();
+      setProducts([]);
+      setCustomers([]);
+      setSales([]);
+      setProductions([]);
+      alert("✅ Todos os dados foram limpos! Sistema pronto para seus dados reais.");
+    }
+  };
+
+  const handleSaleCreated = useCallback((newSale: any) => {
     console.log("Venda criada:", newSale);
+    
+    // Adicionar a venda às vendas
+    setSales(prevSales => [newSale, ...prevSales]);
     
     // Atualizar estoque automaticamente baseado no carrinho ou produtos da venda
     const productsToUpdate = newSale.cart || newSale.products || [];
@@ -118,13 +162,36 @@ const Index = () => {
         })
       );
     }
-  };
+  }, []);
+
+  // Função para transferir produção para estoque
+  const handleProductionToStock = useCallback((production: any) => {
+    // Procurar produto correspondente por nome
+    const productName = (production.pieceName || "").toLowerCase();
+    const productFound = products.find(p => 
+      p.name.toLowerCase().includes(productName) || 
+      productName.includes(p.name.toLowerCase())
+    );
+
+    if (productFound) {
+      // Atualizar estoque do produto
+      setProducts(prevProducts => 
+        prevProducts.map(p => 
+          p.id === productFound.id 
+            ? { ...p, stock: p.stock + (production.quantity || 0) }
+            : p
+        )
+      );
+      
+      console.log(`Produção transferida para estoque: ${production.quantity} unidades de ${production.pieceName}`);
+    }
+  }, [products]);
 
   // Renderização
   const renderContent = () => {
     switch (activeTab) {
       case "dashboard":
-        return <Dashboard />;
+        return <Dashboard products={products} sales={sales} onClearAllData={clearAllData} />;
       case "products":
         return (
           <ProductManagement
@@ -147,7 +214,7 @@ const Index = () => {
           <StockManagement
             products={products}
             setProducts={setProducts}
-            sales={[]}
+            sales={sales}
           />
         );
       case "customers":
@@ -171,7 +238,14 @@ const Index = () => {
       case "reports":
         return <Reports />;
       case "manufacturing":
-        return <Manufacturing onTabChange={setActiveTab} />;
+        return (
+          <Manufacturing 
+            onTabChange={setActiveTab}
+            onProductionToStock={handleProductionToStock}
+            productions={productions}
+            setProductions={setProductions}
+          />
+        );
       case "terminal":
         return <Terminal />;
       case "backup":
@@ -181,7 +255,7 @@ const Index = () => {
       case "advanced-stock":
         return <AdvancedStockManagement />;
       case "settings":
-        return <Settings onProductAdded={handleProductAdded} />;
+        return <Settings onProductAdded={handleProductAdded} onClearAllData={clearAllData} />;
       default:
         return <Dashboard />;
     }

@@ -163,7 +163,13 @@ export function SalesManagement({
             />
           </div>
 
-          <SalesHistory sales={sales} formatCurrency={formatCurrency} />
+          <SalesHistory 
+            sales={sales} 
+            formatCurrency={formatCurrency}
+            onSaleDeleted={(saleId) => {
+              setSales(prevSales => prevSales.filter(sale => sale.id !== saleId));
+            }}
+          />
         </TabsContent>
       </Tabs>
     </div>
