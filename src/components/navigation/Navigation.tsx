@@ -117,11 +117,7 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
           isCollapsed ? "px-1" : "px-3"
         )}>
           {!isCollapsed ? (
-<<<<<<< HEAD
-            <>Sistema de Gestão 2.0 <br /> desenvolvido via Hicham</>
-=======
             <>Sistema de Gestão 2.0 <br /> desenvolvido por hicham</>
->>>>>>> 62b31581964d93e279bc36f903a15a3f1f944994
           ) : (
             <div className="text-center">2.0</div>
           )}
