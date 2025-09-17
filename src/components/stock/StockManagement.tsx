@@ -47,6 +47,11 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
   const [entryQuantity, setEntryQuantity] = useState("");
   const [entryReason, setEntryReason] = useState("");
   const [entryDate, setEntryDate] = useState(new Date().toISOString().split("T")[0]);
+  const [entryCost, setEntryCost] = useState("");
+  const [showNewProductDialog, setShowNewProductDialog] = useState(false);
+  const [newProductName, setNewProductName] = useState("");
+  const [newProductPrice, setNewProductPrice] = useState("");
+  const [newProductCategory, setNewProductCategory] = useState("");
   
   // Estados para saída de estoque
   const [exitProductId, setExitProductId] = useState("");
@@ -61,11 +66,12 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
     if (!product) return;
 
     const quantity = parseInt(entryQuantity);
+    const cost = parseFloat(entryCost) || product.cost;
     
-    // Atualizar estoque do produto
+    // Atualizar estoque e custo do produto
     setProducts(prev => prev.map(p => 
       p.id === product.id 
-        ? { ...p, stock: p.stock + quantity }
+        ? { ...p, stock: p.stock + quantity, cost: cost }
         : p
     ));
 
@@ -77,7 +83,7 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
       type: "entrada",
       quantity,
       date: entryDate,
-      reason: entryReason || "Entrada de estoque"
+      reason: entryReason || `Entrada de estoque - Custo: R$ ${cost.toFixed(2)}`
     };
 
     setMovements(prev => [newMovement, ...prev]);
@@ -85,9 +91,37 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
     // Limpar formulário
     setEntryProductId("");
     setEntryQuantity("");
+    setEntryCost("");
     setEntryReason("");
     setEntryDate(new Date().toISOString().split("T")[0]);
     setIsEntryDialogOpen(false);
+  };
+
+  const handleNewProduct = () => {
+    if (!newProductName.trim() || !newProductPrice || !newProductCategory.trim()) {
+      alert("Preencha todos os campos do produto!");
+      return;
+    }
+
+    const newProduct = {
+      id: Date.now(),
+      name: newProductName.trim(),
+      price: parseFloat(newProductPrice),
+      cost: parseFloat(newProductPrice) * 0.7, // 30% de margem por padrão
+      stock: 0,
+      category: newProductCategory.trim(),
+    };
+
+    setProducts(prev => [...prev, newProduct]);
+    setEntryProductId(newProduct.id.toString());
+    
+    // Limpar formulário
+    setNewProductName("");
+    setNewProductPrice("");
+    setNewProductCategory("");
+    setShowNewProductDialog(false);
+    
+    alert("Produto criado com sucesso!");
   };
 
   const handleStockExit = () => {
@@ -132,52 +166,95 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
     setIsExitDialogOpen(false);
   };
 
-  // Função para importar saídas das vendas
-  const importSalesData = () => {
+  // Função para calcular estoque baseado em entradas e saídas
+  const calculateStock = () => {
     if (!sales.length) {
-      alert("Nenhuma venda encontrada para importar!");
+      alert("Nenhuma venda encontrada para calcular!");
       return;
     }
 
-    let importedMovements = 0;
-    const today = new Date().toISOString().split("T")[0];
+    // Simular estoque inicial antes das vendas
+    let calculatedMovements = 0;
+    const stockCalculations: { [productId: number]: { entrada: number, saida: number } } = {};
 
+    // Primeiro, calcular todas as saídas das vendas
     sales.forEach(sale => {
-      sale.products.forEach(saleProduct => {
-        const product = products.find(p => p.name === saleProduct.name);
+      const saleProducts = sale.cart || sale.products || [];
+      saleProducts.forEach((saleProduct: any) => {
+        const product = products.find(p => 
+          p.name === saleProduct.name || 
+          p.name === saleProduct.productName ||
+          p.id === saleProduct.productId
+        );
+        
         if (product) {
-          // Criar movimento de saída baseado na venda
-          const movement: StockMovement = {
-            id: Date.now() + Math.random(),
-            productId: product.id,
-            productName: product.name,
-            type: "saida",
-            quantity: saleProduct.quantity,
-            date: sale.date,
-            reason: `Venda #${sale.id} - ${sale.customer?.name || 'Cliente'}`
-          };
-
-          setMovements(prev => {
-            // Verificar se já existe movimento para esta venda
-            const exists = prev.some(m => m.reason.includes(`Venda #${sale.id}`));
-            if (!exists) {
-              importedMovements++;
-              return [movement, ...prev];
-            }
-            return prev;
-          });
-
-          // Atualizar estoque do produto
-          setProducts(prev => prev.map(p => 
-            p.id === product.id 
-              ? { ...p, stock: Math.max(0, p.stock - saleProduct.quantity) }
-              : p
-          ));
+          if (!stockCalculations[product.id]) {
+            stockCalculations[product.id] = { entrada: 0, saida: 0 };
+          }
+          stockCalculations[product.id].saida += saleProduct.quantity;
+          
+          // Criar movimento de saída se não existir
+          const movementExists = movements.some(m => 
+            m.reason.includes(`Venda #${sale.id}`) && m.productId === product.id
+          );
+          
+          if (!movementExists) {
+            const movement: StockMovement = {
+              id: Date.now() + Math.random(),
+              productId: product.id,
+              productName: product.name,
+              type: "saida",
+              quantity: saleProduct.quantity,
+              date: sale.date,
+              reason: `Venda #${sale.id} - ${sale.customer?.name || 'Cliente'}`
+            };
+            
+            setMovements(prev => [movement, ...prev]);
+            calculatedMovements++;
+          }
         }
       });
     });
 
-    alert(`${importedMovements} movimentos de saída importados das vendas!`);
+    // Agora calcular quanto estoque seria necessário
+    Object.keys(stockCalculations).forEach(productIdStr => {
+      const productId = parseInt(productIdStr);
+      const product = products.find(p => p.id === productId);
+      if (product) {
+        const calc = stockCalculations[productId];
+        const currentStock = product.stock;
+        const totalSold = calc.saida;
+        const requiredStock = currentStock + totalSold;
+        
+        // Se não há estoque suficiente baseado nas vendas, sugerir entrada
+        if (currentStock < totalSold) {
+          const suggestedEntry = totalSold - currentStock + 50; // +50 como margem de segurança
+          
+          if (window.confirm(`Produto: ${product.name}\nEstoque atual: ${currentStock}\nTotal vendido: ${totalSold}\nSugerimos entrada de: ${suggestedEntry} unidades.\n\nDeseja registrar esta entrada?`)) {
+            // Registrar entrada sugerida
+            const entryMovement: StockMovement = {
+              id: Date.now() + Math.random(),
+              productId: product.id,
+              productName: product.name,
+              type: "entrada",
+              quantity: suggestedEntry,
+              date: new Date().toISOString().split("T")[0],
+              reason: "Entrada calculada automaticamente"
+            };
+            
+            setMovements(prev => [entryMovement, ...prev]);
+            setProducts(prev => prev.map(p => 
+              p.id === product.id 
+                ? { ...p, stock: p.stock + suggestedEntry }
+                : p
+            ));
+            calculatedMovements++;
+          }
+        }
+      }
+    });
+
+    alert(`✅ Cálculo concluído! ${calculatedMovements} movimentos processados.`);
   };
 
   const getTotalMovements = (type: "entrada" | "saida") => {
@@ -191,12 +268,12 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
         <h2 className="text-3xl font-bold tracking-tight">Controle de Estoque</h2>
         <div className="flex space-x-2">
           <Button 
-            onClick={importSalesData}
+            onClick={calculateStock}
             variant="secondary" 
             className="flex items-center space-x-2"
           >
             <TrendingDown className="w-4 h-4" />
-            <span>Importar Vendas</span>
+            <span>Calcular Estoque</span>
           </Button>
           
           <Dialog open={isEntryDialogOpen} onOpenChange={setIsEntryDialogOpen}>
@@ -221,18 +298,37 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
                 </div>
                 <div className="space-y-2">
                   <Label>Produto</Label>
-                  <select
-                    className="w-full p-2 border rounded-md"
-                    value={entryProductId}
-                    onChange={(e) => setEntryProductId(e.target.value)}
-                  >
-                    <option value="">Selecione um produto</option>
-                    {products.map(product => (
-                      <option key={product.id} value={product.id}>
-                        {product.name} (Estoque atual: {product.stock})
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex gap-2">
+                    <select
+                      className="w-full p-2 border rounded-md"
+                      value={entryProductId}
+                      onChange={(e) => setEntryProductId(e.target.value)}
+                    >
+                      <option value="">Selecione um produto</option>
+                      {products.map(product => (
+                        <option key={product.id} value={product.id}>
+                          {product.name} (Estoque atual: {product.stock})
+                        </option>
+                      ))}
+                    </select>
+                    <Button 
+                      type="button" 
+                      onClick={() => setShowNewProductDialog(true)}
+                      className="whitespace-nowrap"
+                    >
+                      Novo Produto
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Custo por Unidade</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={entryCost}
+                    onChange={(e) => setEntryCost(e.target.value)}
+                    placeholder="Custo unitário"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Quantidade</Label>
@@ -263,6 +359,51 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
             </DialogContent>
           </Dialog>
 
+          {/* Dialog para Novo Produto */}
+          <Dialog open={showNewProductDialog} onOpenChange={setShowNewProductDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Novo Produto</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Nome do Produto</Label>
+                  <Input
+                    value={newProductName}
+                    onChange={(e) => setNewProductName(e.target.value)}
+                    placeholder="Nome do produto"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Preço de Venda</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={newProductPrice}
+                    onChange={(e) => setNewProductPrice(e.target.value)}
+                    placeholder="Preço de venda"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Categoria</Label>
+                  <Input
+                    value={newProductCategory}
+                    onChange={(e) => setNewProductCategory(e.target.value)}
+                    placeholder="Categoria do produto"
+                  />
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button variant="outline" onClick={() => setShowNewProductDialog(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleNewProduct}>
+                    Criar Produto
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <Dialog open={isExitDialogOpen} onOpenChange={setIsExitDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" className="flex items-center space-x-2">
@@ -285,18 +426,27 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
                 </div>
                 <div className="space-y-2">
                   <Label>Produto</Label>
-                  <select
-                    className="w-full p-2 border rounded-md"
-                    value={exitProductId}
-                    onChange={(e) => setExitProductId(e.target.value)}
-                  >
-                    <option value="">Selecione um produto</option>
-                    {products.map(product => (
-                      <option key={product.id} value={product.id}>
-                        {product.name} (Estoque atual: {product.stock})
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex gap-2">
+                    <select
+                      className="w-full p-2 border rounded-md"
+                      value={exitProductId}
+                      onChange={(e) => setExitProductId(e.target.value)}
+                    >
+                      <option value="">Selecione um produto</option>
+                      {products.map(product => (
+                        <option key={product.id} value={product.id}>
+                          {product.name} (Estoque atual: {product.stock})
+                        </option>
+                      ))}
+                    </select>
+                    <Button 
+                      type="button" 
+                      onClick={() => setShowNewProductDialog(true)}
+                      className="whitespace-nowrap"
+                    >
+                      Novo Produto
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Quantidade</Label>

@@ -14,8 +14,14 @@ import {
   Warehouse,
   ChevronLeft,
   ChevronRight,
+  Database,
+  CreditCard,
+  AlertTriangle,
+  LogOut,
+  Building2
 } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface NavigationProps {
   activeTab: string;
@@ -28,15 +34,21 @@ const navigationItems = [
   { id: "sales", label: "Vendas", icon: ShoppingCart },
   { id: "stock", label: "Estoque", icon: Warehouse },
   { id: "customers", label: "Clientes", icon: User },
+  { id: "suppliers", label: "Fornecedores", icon: Building2 },
   { id: "budget", label: "Orçamentos", icon: BarChart3 },
+  { id: "expenses", label: "Despesas", icon: CreditCard },
   { id: "withdrawals", label: "Retiradas", icon: DollarSign },
   { id: "reports", label: "Relatórios", icon: BarChart3 },
   { id: "manufacturing", label: "Fabricação", icon: Cog },
+  { id: "financial", label: "Financeiro", icon: CreditCard },
+  { id: "advanced-stock", label: "Estoque Avançado", icon: AlertTriangle },
+  { id: "backup", label: "Backup", icon: Database },
   { id: "terminal", label: "Terminal", icon: PlusCircle },
   { id: "settings", label: "Configurações", icon: Settings },
 ];
 
 export function Navigation({ activeTab, onTabChange }: NavigationProps) {
+  const { signOut } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
@@ -76,7 +88,7 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
       </div>
 
       {/* Navigation Items */}
-      <div className="flex flex-col p-2 space-y-1 overflow-y-auto h-[calc(100vh-120px)]">
+      <div className="flex flex-col p-2 space-y-1 overflow-y-auto h-[calc(100vh-180px)]">
         {navigationItems.map((item) => {
           const Icon = item.icon;
           return (
@@ -99,19 +111,31 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
         })}
       </div>
 
-      {/* Footer - Nova Venda Button */}
-      <div className="absolute bottom-0 left-0 right-0 p-2 border-t border-border bg-card">
-        <Button
-          variant="default"
-          className={cn(
-            "w-full justify-start",
-            isCollapsed ? "px-2" : "px-3"
+      {/* Footer - Sistema desenvolvido */}
+      <div className="absolute bottom-0 left-0 right-0 border-t border-border bg-card">
+        <div className={cn(
+          "w-full text-center text-xs text-muted-foreground p-2",
+          isCollapsed ? "px-1" : "px-3"
+        )}>
+          {!isCollapsed ? (
+            <>Sistema de Gestão 2.0 <br /> desenvolvido por hicham</>
+          ) : (
+            <div className="text-center">2.0</div>
           )}
-          onClick={() => onTabChange("sales")}
-        >
-          <PlusCircle className="w-4 h-4 flex-shrink-0" />
-          {!isCollapsed && <span className="ml-3">Nova Venda</span>}
-        </Button>
+        </div>
+        <div className="p-2">
+          <Button
+            variant="ghost"
+            onClick={signOut}
+            className={cn(
+              "w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50",
+              isCollapsed ? "px-2" : "px-3"
+            )}
+          >
+            <LogOut className="w-4 h-4 flex-shrink-0" />
+            {!isCollapsed && <span className="ml-3">Sair</span>}
+          </Button>
+        </div>
       </div>
     </div>
   );

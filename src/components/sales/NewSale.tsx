@@ -1,5 +1,5 @@
 // src/components/sales/NewSale.tsx
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Check, ChevronsUpDown } from "lucide-react";
+import { toast } from "sonner";
 
 import { Product, Sale, SaleItem, Customer, paymentMethods } from "./types";
 
@@ -35,80 +36,132 @@ export function NewSale({
   onSaleCreated,
   onClose,
 }: NewSaleProps) {
+  // Estados principais da venda
   const [selectedProducts, setSelectedProducts] = useState<SaleItem[]>([]);
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
   const [currentQuantity, setCurrentQuantity] = useState("");
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
-    null
-  );
-  const [saleDate, setSaleDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
-
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<
-    "dinheiro" | "pix" | "credito" | "debito"
-  >("dinheiro");
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [saleDate, setSaleDate] = useState(new Date().toISOString().split("T")[0]);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<"dinheiro" | "pix" | "credito" | "debito">("dinheiro");
   const [amountPaid, setAmountPaid] = useState("");
 
-  // para cadastro rápido de cliente
+  // Estados para cadastro rápido de cliente
   const [isAddingCustomer, setIsAddingCustomer] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newCustomerPhone, setNewCustomerPhone] = useState("");
   const [newCustomerEmail, setNewCustomerEmail] = useState("");
 
-  const formatCurrency = (value: number) => `R$ ${value.toFixed(2)}`;
+  // Estados para produto avulso
+  const [isAddingProduct, setIsAddingProduct] = useState(false);
+  const [newProductName, setNewProductName] = useState("");
+  const [newProductPrice, setNewProductPrice] = useState("");
+  const [newProductCost, setNewProductCost] = useState("");
 
-  const addProductToSale = () => {
+  const formatCurrency = useCallback((value: number) => `R$ ${value.toFixed(2)}`, []);
+
+  const addProductToSale = useCallback(() => {
     if (currentProduct && currentQuantity) {
+      const quantity = parseInt(currentQuantity);
+      if (quantity <= 0) {
+        toast.error("Quantidade deve ser maior que zero!");
+        return;
+      }
+
       const saleItem: SaleItem = {
         productId: currentProduct.id,
         productName: currentProduct.name,
-        quantity: parseInt(currentQuantity),
+        quantity: quantity,
         price: currentProduct.price,
       };
-      setSelectedProducts([...selectedProducts, saleItem]);
+      setSelectedProducts(prev => [...prev, saleItem]);
       setCurrentProduct(null);
       setCurrentQuantity("");
+      toast.success(`${currentProduct.name} adicionado à venda!`);
     }
-  };
+  }, [currentProduct, currentQuantity]);
 
-  const removeProductFromSale = (index: number) => {
-    setSelectedProducts(selectedProducts.filter((_, i) => i !== index));
-  };
+  const addManualProductToSale = useCallback(() => {
+    if (!newProductName.trim()) {
+      toast.error("Nome do produto é obrigatório!");
+      return;
+    }
+    
+    if (!newProductPrice || parseFloat(newProductPrice) <= 0) {
+      toast.error("Preço deve ser maior que zero!");
+      return;
+    }
+    
+    if (!currentQuantity || parseInt(currentQuantity) <= 0) {
+      toast.error("Quantidade deve ser maior que zero!");
+      return;
+    }
 
-  const calculateTotal = () =>
-    selectedProducts.reduce(
-      (sum, item) => sum + item.quantity * item.price,
-      0
-    );
+    const saleItem: SaleItem = {
+      productId: Date.now(), // ID temporário
+      productName: newProductName.trim(),
+      quantity: parseInt(currentQuantity),
+      price: parseFloat(newProductPrice),
+    };
+    
+    setSelectedProducts(prev => [...prev, saleItem]);
+    setNewProductName("");
+    setNewProductPrice("");
+    setNewProductCost("");
+    setCurrentQuantity("");
+    setIsAddingProduct(false);
+    toast.success(`${newProductName} adicionado à venda!`);
+  }, [newProductName, newProductPrice, currentQuantity]);
 
-  const calculateProfit = () =>
+  const removeProductFromSale = useCallback((index: number) => {
+    setSelectedProducts(prev => prev.filter((_, i) => i !== index));
+    toast.info("Produto removido da venda");
+  }, []);
+
+  const calculateTotal = useCallback(() =>
+    selectedProducts.reduce((sum, item) => sum + item.quantity * item.price, 0), 
+    [selectedProducts]
+  );
+
+  const calculateProfit = useCallback(() =>
     selectedProducts.reduce((sum, item) => {
       const productData = products.find((p) => p.id === item.productId);
-      return productData
-        ? sum + item.quantity * (item.price - productData.cost)
-        : sum;
-    }, 0);
+      if (productData) {
+        return sum + item.quantity * (item.price - productData.cost);
+      }
+      // Para produtos avulsos, estimar lucro baseado em 70% do preço de venda
+      const estimatedCost = item.price * 0.3;
+      return sum + item.quantity * (item.price - estimatedCost);
+    }, 0), 
+    [selectedProducts, products]
+  );
 
-  const calculateChange = () => {
+  const calculateChange = useCallback(() => {
     const total = calculateTotal();
     const paid = parseFloat(amountPaid) || 0;
-    return selectedPaymentMethod === "dinheiro"
-      ? Math.max(0, paid - total)
-      : 0;
-  };
+    return selectedPaymentMethod === "dinheiro" ? Math.max(0, paid - total) : 0;
+  }, [calculateTotal, amountPaid, selectedPaymentMethod]);
 
-  const finalizeSale = () => {
-    if (selectedProducts.length === 0) return;
+  const finalizeSale = useCallback(() => {
+    if (selectedProducts.length === 0) {
+      toast.error("Adicione pelo menos um produto à venda!");
+      return;
+    }
+
+    // Validação para pagamento em dinheiro
+    if (selectedPaymentMethod === "dinheiro") {
+      const total = calculateTotal();
+      const paid = parseFloat(amountPaid) || 0;
+      
+      if (paid < total) {
+        toast.error(`Valor insuficiente! Total: ${formatCurrency(total)}, Pago: ${formatCurrency(paid)}`);
+        return;
+      }
+    }
 
     const total = calculateTotal();
     const profit = calculateProfit();
     const paid = parseFloat(amountPaid) || total;
-    const finalAmountPaid = ["pix", "credito", "debito"].includes(
-      selectedPaymentMethod
-    )
-      ? total
-      : paid;
+    const finalAmountPaid = ["pix", "credito", "debito"].includes(selectedPaymentMethod) ? total : paid;
 
     const newSale: Sale = {
       id: Date.now(),
@@ -118,22 +171,55 @@ export function NewSale({
         quantity: item.quantity,
         price: item.price,
       })),
+      cart: selectedProducts,
       total,
       profit,
       paymentMethod: selectedPaymentMethod,
       amountPaid: finalAmountPaid,
       change: calculateChange(),
       status: "pago",
-      customer:
-        selectedCustomer || {
-          id: Date.now(),
-          name: "Cliente",
-        },
+      customer: selectedCustomer || { id: Date.now(), name: "Cliente Avulso" },
     };
 
-    onSaleCreated(newSale);
-    onClose();
-  };
+    try {
+      onSaleCreated(newSale);
+      
+      // Limpar formulário após sucesso
+      setSelectedProducts([]);
+      setCurrentProduct(null);
+      setCurrentQuantity("");
+      setSelectedCustomer(null);
+      setAmountPaid("");
+      setSaleDate(new Date().toISOString().split("T")[0]);
+      setSelectedPaymentMethod("dinheiro");
+      setIsAddingCustomer(false);
+      setIsAddingProduct(false);
+      setNewCustomerName("");
+      setNewCustomerPhone("");
+      setNewCustomerEmail("");
+      setNewProductName("");
+      setNewProductPrice("");
+      setNewProductCost("");
+      
+      toast.success("✅ Venda finalizada com sucesso!");
+      onClose();
+    } catch (error) {
+      console.error("Erro ao finalizar venda:", error);
+      toast.error("❌ Erro ao finalizar a venda. Tente novamente.");
+    }
+  }, [
+    selectedProducts,
+    selectedPaymentMethod,
+    calculateTotal,
+    amountPaid,
+    formatCurrency,
+    calculateProfit,
+    calculateChange,
+    saleDate,
+    selectedCustomer,
+    onSaleCreated,
+    onClose
+  ]);
 
   return (
     <div className="space-y-4">
@@ -249,6 +335,59 @@ export function NewSale({
         </div>
       )}
 
+      {/* Formulário de produto avulso */}
+      {isAddingProduct && (
+        <div className="p-4 border rounded-lg space-y-3">
+          <h4 className="font-semibold">Produto Avulso</h4>
+          <Input
+            placeholder="Nome do produto"
+            value={newProductName}
+            onChange={(e) => setNewProductName(e.target.value)}
+          />
+          <div className="flex space-x-2">
+            <Input
+              placeholder="Preço (R$)"
+              type="number"
+              step="0.01"
+              value={newProductPrice}
+              onChange={(e) => setNewProductPrice(e.target.value)}
+            />
+            <Input
+              placeholder="Custo (R$)"
+              type="number"
+              step="0.01"
+              value={newProductCost}
+              onChange={(e) => setNewProductCost(e.target.value)}
+            />
+            <Input
+              type="number"
+              placeholder="Qtd"
+              value={currentQuantity}
+              onChange={(e) => setCurrentQuantity(e.target.value)}
+            />
+          </div>
+          <div className="flex space-x-2">
+            <Button
+              onClick={addManualProductToSale}
+              disabled={!newProductName || !newProductPrice || !currentQuantity}
+            >
+              Adicionar à Venda
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsAddingProduct(false);
+                setNewProductName("");
+                setNewProductPrice("");
+                setNewProductCost("");
+              }}
+            >
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Seleção de Produto */}
       <div className="flex space-x-2">
         <div className="flex-1">
@@ -284,6 +423,14 @@ export function NewSale({
                         {product.name} — {formatCurrency(product.price)}
                       </CommandItem>
                     ))}
+
+                    {/* opção para adicionar produto avulso */}
+                    <CommandItem
+                      onSelect={() => setIsAddingProduct(true)}
+                      className="text-primary cursor-pointer"
+                    >
+                      + Adicionar produto avulso
+                    </CommandItem>
                   </CommandGroup>
                 </CommandList>
               </Command>

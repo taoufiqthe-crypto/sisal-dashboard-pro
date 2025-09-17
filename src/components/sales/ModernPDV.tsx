@@ -1,5 +1,4 @@
-// src/components/sales/PDVInterface.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,35 +31,40 @@ import {
   Banknote,
   Smartphone,
   Printer,
+  Zap,
+  TrendingUp,
+  Package,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Product, Sale, SaleItem, Customer, paymentMethods } from "./types";
 import ReceiptPrinter from "./ReceiptPrinter";
 
-interface PDVInterfaceProps {
+interface ModernPDVProps {
   products: Product[];
   customers: Customer[];
   setCustomers: React.Dispatch<React.SetStateAction<Customer[]>>;
   onSaleCreated: (sale: Sale) => void;
 }
 
-export function PDVInterface({
+export function ModernPDV({
   products,
   customers,
   setCustomers,
   onSaleCreated,
-}: PDVInterfaceProps) {
+}: ModernPDVProps) {
   const [cart, setCart] = useState<SaleItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<"dinheiro" | "pix" | "credito" | "debito">("dinheiro");
+  const [paymentMethod, setPaymentMethod] = useState<"dinheiro" | "pix" | "credito" | "debito">("pix");
   const [amountPaid, setAmountPaid] = useState("");
   const [discount, setDiscount] = useState(0);
   const [discountType, setDiscountType] = useState<"reais" | "percent">("reais");
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showReceiptDialog, setShowReceiptDialog] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [showManualProductDialog, setShowManualProductDialog] = useState(false);
   const [manualProduct, setManualProduct] = useState({
     name: "",
@@ -68,23 +72,40 @@ export function PDVInterface({
     quantity: "1"
   });
 
-  // Filtrar produtos
-  const filteredProducts = products.filter((product) => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === "all" || product.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  // Memoized filtered products for better performance
+  const filteredProducts = useMemo(() => {
+    return products.filter((product) => {
+      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (product.barcode && product.barcode.includes(searchTerm));
+      const matchesCategory = selectedCategory === "all" || product.category === selectedCategory;
+      const hasStock = product.stock > 0;
+      return matchesSearch && matchesCategory && hasStock;
+    });
+  }, [products, searchTerm, selectedCategory]);
 
-  // Obter categorias únicas
-  const categories = Array.from(new Set(products.map(p => p.category))).filter(Boolean);
+  // Memoized categories
+  const categories = useMemo(() => {
+    return Array.from(new Set(products.map(p => p.category))).filter(Boolean);
+  }, [products]);
 
-  const formatCurrency = (value: number) => `R$ ${value.toFixed(2)}`;
+  const formatCurrency = useCallback((value: number) => 
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value), []);
 
-  const addToCart = (product: Product) => {
+  const addToCart = useCallback((product: Product) => {
+    if (product.stock <= 0) {
+      toast.error("Produto sem estoque!");
+      return;
+    }
+
     const existingItem = cart.find(item => item.productId === product.id);
     
     if (existingItem) {
-      setCart(cart.map(item =>
+      if (existingItem.quantity >= product.stock) {
+        toast.error("Quantidade máxima em estoque atingida!");
+        return;
+      }
+      setCart(prev => prev.map(item =>
         item.productId === product.id
           ? { ...item, quantity: item.quantity + 1 }
           : item
@@ -96,13 +117,15 @@ export function PDVInterface({
         quantity: 1,
         price: product.price,
       };
-      setCart([...cart, newItem]);
+      setCart(prev => [...prev, newItem]);
     }
-  };
+    
+    toast.success(`${product.name} adicionado ao carrinho!`);
+  }, [cart]);
 
-  const addManualProductToCart = () => {
+  const addManualProductToCart = useCallback(() => {
     if (!manualProduct.name.trim() || !manualProduct.price || parseFloat(manualProduct.price) <= 0) {
-      alert("Preencha o nome e preço do produto!");
+      toast.error("Preencha o nome e preço do produto!");
       return;
     }
 
@@ -116,42 +139,55 @@ export function PDVInterface({
       price: price,
     };
 
-    setCart([...cart, newItem]);
+    setCart(prev => [...prev, newItem]);
+    toast.success(`${manualProduct.name} adicionado ao carrinho!`);
     
     // Limpar formulário e fechar dialog
     setManualProduct({ name: "", price: "", quantity: "1" });
     setShowManualProductDialog(false);
-  };
+  }, [manualProduct]);
 
-  const updateQuantity = (productId: number, newQuantity: number) => {
+  const updateQuantity = useCallback((productId: number, newQuantity: number) => {
+    const product = products.find(p => p.id === productId);
+    
+    if (!product) return;
+    
     if (newQuantity <= 0) {
       removeFromCart(productId);
-    } else {
-      setCart(cart.map(item =>
-        item.productId === productId
-          ? { ...item, quantity: newQuantity }
-          : item
-      ));
+      return;
     }
-  };
+    
+    if (newQuantity > product.stock) {
+      toast.error("Quantidade superior ao estoque!");
+      return;
+    }
 
-  const removeFromCart = (productId: number) => {
-    setCart(cart.filter(item => item.productId !== productId));
-  };
+    setCart(prev => prev.map(item =>
+      item.productId === productId
+        ? { ...item, quantity: newQuantity }
+        : item
+    ));
+  }, [products]);
 
-  const clearCart = () => {
+  const removeFromCart = useCallback((productId: number) => {
+    setCart(prev => prev.filter(item => item.productId !== productId));
+    toast.info("Item removido do carrinho");
+  }, []);
+
+  const clearCart = useCallback(() => {
     setCart([]);
     setSelectedCustomer(null);
     setDiscount(0);
     setDiscountType("reais");
     setAmountPaid("");
-  };
+    toast.info("Carrinho limpo");
+  }, []);
 
-  const calculateSubtotal = () => {
+  const calculateSubtotal = useCallback(() => {
     return cart.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-  };
+  }, [cart]);
 
-  const calculateTotal = () => {
+  const calculateTotal = useCallback(() => {
     const subtotal = calculateSubtotal();
     let discountAmount = 0;
     
@@ -162,23 +198,23 @@ export function PDVInterface({
     }
     
     return Math.max(0, subtotal - discountAmount);
-  };
+  }, [calculateSubtotal, discount, discountType]);
 
-  const getDiscountAmount = () => {
+  const getDiscountAmount = useCallback(() => {
     const subtotal = calculateSubtotal();
     if (discountType === "percent") {
       return (subtotal * discount) / 100;
     }
     return discount;
-  };
+  }, [calculateSubtotal, discount, discountType]);
 
-  const calculateChange = () => {
+  const calculateChange = useCallback(() => {
     const total = calculateTotal();
     const paid = parseFloat(amountPaid) || 0;
     return paymentMethod === "dinheiro" ? Math.max(0, paid - total) : 0;
-  };
+  }, [calculateTotal, amountPaid, paymentMethod]);
 
-  const canFinalizeSale = () => {
+  const canFinalizeSale = useCallback(() => {
     const total = calculateTotal();
     if (cart.length === 0) return false;
     if (paymentMethod === "dinheiro") {
@@ -186,44 +222,58 @@ export function PDVInterface({
       return paid >= total;
     }
     return true;
-  };
+  }, [cart.length, paymentMethod, amountPaid, calculateTotal]);
 
-  const finalizeSale = () => {
+  const finalizeSale = useCallback(async () => {
     if (!canFinalizeSale()) return;
 
-    const total = calculateTotal();
-    const profit = cart.reduce((sum, item) => {
-      const productData = products.find(p => p.id === item.productId);
-      return productData ? sum + item.quantity * (item.price - productData.cost) : sum;
-    }, 0);
+    setIsProcessing(true);
+    
+    try {
+      const total = calculateTotal();
+      const profit = cart.reduce((sum, item) => {
+        const productData = products.find(p => p.id === item.productId);
+        return productData ? sum + item.quantity * (item.price - productData.cost) : sum;
+      }, 0);
 
-    const finalAmountPaid = paymentMethod === "dinheiro" 
-      ? parseFloat(amountPaid) 
-      : total;
+      const finalAmountPaid = paymentMethod === "dinheiro" 
+        ? parseFloat(amountPaid) 
+        : total;
 
-    const newSale: Sale = {
-      id: Date.now(),
-      date: new Date().toISOString().split("T")[0],
-      products: cart.map(item => ({
-        name: item.productName,
-        quantity: item.quantity,
-        price: item.price,
-      })),
-      total,
-      profit,
-      paymentMethod,
-      amountPaid: finalAmountPaid,
-      change: calculateChange(),
-      status: "pago",
-      customer: selectedCustomer || { id: Date.now(), name: "Cliente" },
-    };
+      const newSale: Sale = {
+        id: Date.now(),
+        date: new Date().toISOString().split("T")[0],
+        products: cart.map(item => ({
+          name: item.productName,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+        cart: cart, // Adicionando o carrinho completo para facilitar a atualização do estoque
+        total,
+        profit,
+        paymentMethod,
+        amountPaid: finalAmountPaid,
+        change: calculateChange(),
+        status: "pago",
+        customer: selectedCustomer || { id: Date.now(), name: "Cliente Avulso" },
+      };
 
-    onSaleCreated(newSale);
-    setLastSale(newSale);
-    setShowPaymentDialog(false);
-    setShowReceiptDialog(true);
-    clearCart();
-  };
+      // Simulate processing delay for professional feel
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      onSaleCreated(newSale);
+      setLastSale(newSale);
+      setShowPaymentDialog(false);
+      setShowReceiptDialog(true);
+      clearCart();
+      
+      toast.success("Venda finalizada com sucesso!");
+    } catch (error) {
+      toast.error("Erro ao processar venda");
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [canFinalizeSale, calculateTotal, cart, products, paymentMethod, amountPaid, calculateChange, selectedCustomer, onSaleCreated, clearCart]);
 
   const getPaymentIcon = (method: string) => {
     switch (method) {
@@ -235,42 +285,75 @@ export function PDVInterface({
     }
   };
 
+  // Auto-focus search on mount
+  useEffect(() => {
+    const searchInput = document.querySelector('input[placeholder="Buscar produtos..."]') as HTMLInputElement;
+    if (searchInput) {
+      searchInput.focus();
+    }
+  }, []);
+
   return (
-    <div className="h-screen flex bg-background">
-      {/* Área Principal - Produtos */}
+    <div className="h-screen flex bg-gradient-to-br from-background to-muted/20">
+      {/* Main Area - Products */}
       <div className="flex-1 p-6 overflow-hidden">
         <div className="h-full flex flex-col">
-          {/* Cabeçalho */}
+          {/* Modern Header */}
           <div className="mb-6">
-            <h1 className="text-3xl font-bold mb-4">PDV - Ponto de Venda</h1>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-lg pdv-btn-primary">
+                <Zap className="w-6 h-6" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                  PDV Professional
+                </h1>
+                <p className="text-muted-foreground">Sistema de Vendas Moderno</p>
+              </div>
+            </div>
             
-            {/* Filtros */}
+            {/* Enhanced Filters */}
             <div className="flex gap-4 mb-4">
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
-                  placeholder="Buscar produtos..."
+                  placeholder="Buscar produtos, código de barras..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 h-11 border-2 focus:border-primary/50 transition-colors"
                 />
               </div>
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="w-48 h-11 border-2">
                   <SelectValue placeholder="Categoria" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas as categorias</SelectItem>
                   {categories.map(category => (
                     <SelectItem key={category} value={category}>
-                      {category}
+                      <div className="flex items-center gap-2">
+                        <Package className="w-4 h-4" />
+                        {category}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Quick Stats */}
+            <div className="flex gap-4 mb-4">
+              <div className="flex items-center gap-2 px-3 py-2 bg-success/10 rounded-lg">
+                <TrendingUp className="w-4 h-4 text-success" />
+                <span className="text-sm font-medium">{filteredProducts.length} produtos</span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 rounded-lg">
+                <ShoppingCart className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium">{cart.length} no carrinho</span>
+              </div>
               <Button 
                 onClick={() => setShowManualProductDialog(true)}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 h-8 px-3 bg-amber-500 hover:bg-amber-600 text-white"
               >
                 <Plus className="w-4 h-4" />
                 Produto Manual
@@ -278,89 +361,123 @@ export function PDVInterface({
             </div>
           </div>
 
-          {/* Grid de Produtos */}
+          {/* Enhanced Products Grid */}
           <div className="flex-1 overflow-auto">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <div className="pdv-product-grid">
               {filteredProducts.map((product) => (
                 <Card 
                   key={product.id} 
-                  className="cursor-pointer hover:shadow-lg transition-shadow"
+                  className="pdv-product-card group"
                   onClick={() => addToCart(product)}
                 >
                   <CardContent className="p-4">
-                    <div className="aspect-square bg-muted rounded-lg mb-3 flex items-center justify-center">
-                      <span className="text-2xl">{product.name.charAt(0)}</span>
+                    <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 rounded-lg mb-3 flex items-center justify-center group-hover:from-primary/10 group-hover:to-primary/5 transition-colors">
+                      <span className="text-3xl font-bold text-primary/60">{product.name.charAt(0)}</span>
                     </div>
-                    <h3 className="font-semibold text-sm mb-1 line-clamp-2">{product.name}</h3>
-                    <p className="text-lg font-bold text-primary">{formatCurrency(product.price)}</p>
-                    {product.stock !== undefined && (
-                      <Badge variant={product.stock > 10 ? "default" : "destructive"} className="text-xs mt-1">
-                        Estoque: {product.stock}
+                    <h3 className="font-semibold text-sm mb-2 line-clamp-2 group-hover:text-primary transition-colors">
+                      {product.name}
+                    </h3>
+                    <p className="text-lg font-bold text-primary mb-2">
+                      {formatCurrency(product.price)}
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <Badge 
+                        variant={product.stock > 10 ? "default" : product.stock > 5 ? "secondary" : "destructive"} 
+                        className="text-xs"
+                      >
+                        {product.stock} un.
                       </Badge>
-                    )}
+                      <Badge variant="outline" className="text-xs">
+                        {product.category}
+                      </Badge>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
+              
+              {filteredProducts.length === 0 && (
+                <div className="col-span-full flex flex-col items-center justify-center py-12">
+                  <Package className="w-16 h-16 text-muted-foreground/50 mb-4" />
+                  <h3 className="text-lg font-semibold text-muted-foreground mb-2">
+                    Nenhum produto encontrado
+                  </h3>
+                  <p className="text-sm text-muted-foreground text-center">
+                    Tente ajustar os filtros ou verificar se há produtos em estoque
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Carrinho Lateral */}
-      <div className="w-96 bg-card border-l p-6 flex flex-col">
-        <div className="flex items-center gap-2 mb-6">
-          <ShoppingCart className="w-6 h-6" />
-          <h2 className="text-xl font-bold">Carrinho</h2>
-          <Badge variant="secondary">{cart.length}</Badge>
+      {/* Modern Cart Sidebar */}
+      <div className="w-96 pdv-cart border-l flex flex-col">
+        <div className="p-6 border-b">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <ShoppingCart className="w-5 h-5 text-primary" />
+            </div>
+            <h2 className="text-xl font-bold">Carrinho</h2>
+            <Badge variant="secondary" className="ml-auto">{cart.length}</Badge>
+          </div>
+
+          {/* Customer Selection */}
+          <div>
+            <Label className="text-sm font-medium flex items-center gap-2">
+              <User className="w-4 h-4" />
+              Cliente
+            </Label>
+            <Select 
+              value={selectedCustomer?.id.toString() || ""} 
+              onValueChange={(value) => {
+                const customer = customers.find(c => c.id.toString() === value);
+                setSelectedCustomer(customer || null);
+              }}
+            >
+              <SelectTrigger className="mt-2 border-2">
+                <SelectValue placeholder="Selecionar cliente (opcional)" />
+              </SelectTrigger>
+              <SelectContent>
+                {customers.map(customer => (
+                  <SelectItem key={customer.id} value={customer.id.toString()}>
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      <div>
+                        <div className="font-medium">{customer.name}</div>
+                        {customer.phone && (
+                          <div className="text-xs text-muted-foreground">{customer.phone}</div>
+                        )}
+                      </div>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        {/* Cliente */}
-        <div className="mb-4">
-          <Label className="text-sm font-medium">Cliente</Label>
-          <Select 
-            value={selectedCustomer?.id.toString() || ""} 
-            onValueChange={(value) => {
-              const customer = customers.find(c => c.id.toString() === value);
-              setSelectedCustomer(customer || null);
-            }}
-          >
-            <SelectTrigger className="mt-1">
-              <SelectValue placeholder="Selecionar cliente" />
-            </SelectTrigger>
-            <SelectContent>
-              {customers.map(customer => (
-                <SelectItem key={customer.id} value={customer.id.toString()}>
-                  <div className="flex items-center gap-2">
-                    <User className="w-4 h-4" />
-                    {customer.name}
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Separator />
 
-        <Separator className="mb-4" />
-
-        {/* Itens do Carrinho */}
-        <div className="flex-1 overflow-auto mb-4">
+        {/* Cart Items */}
+        <div className="flex-1 overflow-auto p-6">
           {cart.length === 0 ? (
-            <div className="text-center text-muted-foreground py-8">
-              <ShoppingCart className="w-12 h-12 mx-auto mb-2 opacity-50" />
-              <p>Carrinho vazio</p>
-              <p className="text-sm">Clique nos produtos para adicionar</p>
+            <div className="text-center text-muted-foreground py-12">
+              <ShoppingCart className="w-16 h-16 mx-auto mb-4 opacity-50" />
+              <p className="font-medium mb-2">Carrinho vazio</p>
+              <p className="text-sm">Adicione produtos para começar a venda</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {cart.map((item) => (
-                <Card key={item.productId} className="p-3">
-                  <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-medium text-sm">{item.productName}</h4>
+                <Card key={item.productId} className="p-3 border-2 hover:border-primary/20 transition-colors">
+                  <div className="flex justify-between items-start mb-3">
+                    <h4 className="font-medium text-sm flex-1 pr-2">{item.productName}</h4>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => removeFromCart(item.productId)}
-                      className="h-6 w-6 p-0"
+                      className="h-6 w-6 p-0 hover:bg-destructive/10 hover:text-destructive"
                     >
                       <Trash2 className="w-3 h-3" />
                     </Button>
@@ -372,23 +489,23 @@ export function PDVInterface({
                         variant="outline"
                         size="sm"
                         onClick={() => updateQuantity(item.productId, item.quantity - 1)}
-                        className="h-6 w-6 p-0"
+                        className="h-7 w-7 p-0"
                       >
                         <Minus className="w-3 h-3" />
                       </Button>
-                      <span className="w-8 text-center text-sm">{item.quantity}</span>
+                      <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => updateQuantity(item.productId, item.quantity + 1)}
-                        className="h-6 w-6 p-0"
+                        className="h-7 w-7 p-0"
                       >
                         <Plus className="w-3 h-3" />
                       </Button>
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-muted-foreground">{formatCurrency(item.price)} cada</p>
-                      <p className="font-semibold">{formatCurrency(item.quantity * item.price)}</p>
+                      <p className="font-semibold text-primary">{formatCurrency(item.quantity * item.price)}</p>
                     </div>
                   </div>
                 </Card>
@@ -397,15 +514,13 @@ export function PDVInterface({
           )}
         </div>
 
-        {/* Resumo */}
+        {/* Cart Summary & Actions */}
         {cart.length > 0 && (
-          <>
-            <Separator className="mb-4" />
-            
-            {/* Desconto */}
+          <div className="p-6 border-t bg-muted/30">
+            {/* Discount Section */}
             <div className="mb-4">
               <Label className="text-sm font-medium">Desconto</Label>
-              <div className="flex gap-2 mt-1">
+              <div className="flex gap-2 mt-2">
                 <Select value={discountType} onValueChange={(value: "reais" | "percent") => setDiscountType(value)}>
                   <SelectTrigger className="w-20">
                     <SelectValue />
@@ -420,77 +535,86 @@ export function PDVInterface({
                   step="0.01"
                   value={discount}
                   onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
-                  placeholder="0.00"
+                  placeholder="0,00"
                   className="flex-1"
                 />
               </div>
             </div>
 
-            <div className="space-y-2 mb-4">
-              <div className="flex justify-between">
+            {/* Summary */}
+            <div className="space-y-2 mb-6">
+              <div className="flex justify-between text-sm">
                 <span>Subtotal:</span>
-                <span>{formatCurrency(calculateSubtotal())}</span>
+                <span className="font-medium">{formatCurrency(calculateSubtotal())}</span>
               </div>
               {discount > 0 && (
-                <div className="flex justify-between text-green-600">
+                <div className="flex justify-between text-sm text-success">
                   <span>Desconto ({discountType === "percent" ? `${discount}%` : "R$"}):</span>
                   <span>-{formatCurrency(getDiscountAmount())}</span>
                 </div>
               )}
+              <Separator />
               <div className="flex justify-between text-lg font-bold">
                 <span>Total:</span>
-                <span>{formatCurrency(calculateTotal())}</span>
+                <span className="text-primary">{formatCurrency(calculateTotal())}</span>
               </div>
             </div>
 
-            <div className="space-y-2">
+            {/* Action Buttons */}
+            <div className="space-y-3">
               <Button
                 onClick={() => setShowPaymentDialog(true)}
-                className="w-full"
+                className="w-full h-12 pdv-btn-primary text-lg font-semibold"
                 disabled={cart.length === 0}
               >
-                <Receipt className="w-4 h-4 mr-2" />
-                Finalizar e Imprimir
+                <Receipt className="w-5 h-5 mr-2" />
+                Finalizar Venda
               </Button>
               <Button
                 variant="outline"
                 onClick={clearCart}
-                className="w-full"
+                className="w-full border-2 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/20"
               >
+                <Trash2 className="w-4 h-4 mr-2" />
                 Limpar Carrinho
               </Button>
             </div>
-          </>
+          </div>
         )}
       </div>
 
-      {/* Dialog de Pagamento */}
+      {/* Payment Dialog */}
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Finalizar Pagamento</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Calculator className="w-5 h-5 text-primary" />
+              Finalizar Pagamento
+            </DialogTitle>
           </DialogHeader>
           
-          <div className="space-y-4">
-            <div className="bg-muted p-4 rounded-lg">
-              <div className="flex justify-between text-lg font-bold">
+          <div className="space-y-6">
+            <div className="bg-primary/5 border border-primary/20 p-4 rounded-lg">
+              <div className="flex justify-between items-center text-lg font-bold">
                 <span>Total a pagar:</span>
-                <span>{formatCurrency(calculateTotal())}</span>
+                <span className="text-primary text-2xl">{formatCurrency(calculateTotal())}</span>
               </div>
             </div>
 
             <div>
               <Label className="text-sm font-medium">Forma de Pagamento</Label>
-              <div className="grid grid-cols-2 gap-2 mt-2">
+              <div className="grid grid-cols-2 gap-3 mt-3">
                 {paymentMethods.map((method) => (
                   <Button
                     key={method.type}
                     variant={paymentMethod === method.type ? "default" : "outline"}
                     onClick={() => setPaymentMethod(method.type)}
-                    className="flex items-center gap-2 h-12"
+                    className={`flex items-center gap-2 h-14 ${
+                      paymentMethod === method.type ? "pdv-btn-primary" : ""
+                    }`}
                   >
                     {getPaymentIcon(method.type)}
-                    {method.label}
+                    <span className="text-sm">{method.label}</span>
                   </Button>
                 ))}
               </div>
@@ -505,13 +629,13 @@ export function PDVInterface({
                   value={amountPaid}
                   onChange={(e) => setAmountPaid(e.target.value)}
                   placeholder={formatCurrency(calculateTotal())}
-                  className="mt-1"
+                  className="mt-2 h-12 text-lg border-2"
                 />
                 {amountPaid && parseFloat(amountPaid) >= calculateTotal() && (
-                  <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="mt-3 p-4 bg-success/10 border border-success/20 rounded-lg">
                     <div className="flex items-center gap-2">
-                      <Calculator className="w-4 h-4 text-green-600" />
-                      <span className="font-semibold text-green-800">
+                      <Calculator className="w-5 h-5 text-success" />
+                      <span className="font-semibold text-success text-lg">
                         Troco: {formatCurrency(calculateChange())}
                       </span>
                     </div>
@@ -520,47 +644,48 @@ export function PDVInterface({
               </div>
             )}
 
-            <div className="flex gap-2 pt-4">
+            <div className="flex gap-3 pt-4">
               <Button
                 variant="outline"
                 onClick={() => setShowPaymentDialog(false)}
-                className="flex-1"
+                className="flex-1 h-12"
+                disabled={isProcessing}
               >
                 Cancelar
               </Button>
               <Button
                 onClick={finalizeSale}
-                disabled={!canFinalizeSale()}
-                className="flex-1"
+                disabled={!canFinalizeSale() || isProcessing}
+                className="flex-1 h-12 pdv-btn-primary"
               >
-                Confirmar Pagamento
+                {isProcessing ? "Processando..." : "Confirmar Pagamento"}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog de Recibo */}
+      {/* Receipt Dialog */}
       <Dialog open={showReceiptDialog} onOpenChange={setShowReceiptDialog}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Printer className="w-5 h-5" />
-              Venda Finalizada
+              <Printer className="w-5 h-5 text-success" />
+              Venda Finalizada com Sucesso!
             </DialogTitle>
           </DialogHeader>
           
           {lastSale && (
-            <div className="space-y-4">
+            <div className="space-y-6">
               <ReceiptPrinter sale={lastSale} />
               
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="font-semibold text-green-800">Venda realizada com sucesso!</span>
+              <div className="bg-success/10 border border-success/20 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-3 h-3 bg-success rounded-full animate-pulse"></div>
+                  <span className="font-semibold text-success">Pagamento processado!</span>
                 </div>
                 
-                <div className="space-y-1 text-sm text-green-700">
+                <div className="space-y-2 text-sm text-success/80">
                   <div className="flex justify-between">
                     <span>Total:</span>
                     <span className="font-semibold">{formatCurrency(lastSale.total)}</span>
@@ -584,8 +709,9 @@ export function PDVInterface({
 
               <Button
                 onClick={() => setShowReceiptDialog(false)}
-                className="w-full"
+                className="w-full h-12 pdv-btn-primary"
               >
+                <Zap className="w-4 h-4 mr-2" />
                 Nova Venda
               </Button>
             </div>
@@ -658,4 +784,3 @@ export function PDVInterface({
     </div>
   );
 }
-
