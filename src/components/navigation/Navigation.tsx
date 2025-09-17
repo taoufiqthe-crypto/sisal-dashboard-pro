@@ -17,7 +17,8 @@ import {
   Database,
   CreditCard,
   AlertTriangle,
-  LogOut
+  LogOut,
+  Building2
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -33,7 +34,9 @@ const navigationItems = [
   { id: "sales", label: "Vendas", icon: ShoppingCart },
   { id: "stock", label: "Estoque", icon: Warehouse },
   { id: "customers", label: "Clientes", icon: User },
+  { id: "suppliers", label: "Fornecedores", icon: Building2 },
   { id: "budget", label: "Orçamentos", icon: BarChart3 },
+  { id: "expenses", label: "Despesas", icon: CreditCard },
   { id: "withdrawals", label: "Retiradas", icon: DollarSign },
   { id: "reports", label: "Relatórios", icon: BarChart3 },
   { id: "manufacturing", label: "Fabricação", icon: Cog },
@@ -115,7 +118,7 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
           isCollapsed ? "px-1" : "px-3"
         )}>
           {!isCollapsed ? (
-            "Sistema de Gestão 2.0 desenvolvido via Hicham"
+            <>Sistema de Gestão 2.0 <br /> desenvolvido por hicham</>
           ) : (
             <div className="text-center">2.0</div>
           )}

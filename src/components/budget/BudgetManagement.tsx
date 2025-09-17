@@ -76,41 +76,7 @@ const defaultCompanyData: CompanyData = {
   name: 'Gesso Primus'
 };
 
-const mockBudgets: Budget[] = [
-  { 
-    id: 1, 
-    date: "2024-01-10", 
-    products: [
-      { name: "Gesso São Francisco", quantity: 10, price: 29.90 },
-      { name: "Placas 60x60", quantity: 5, price: 30.00 }
-    ],
-    total: 449.00,
-    profit: 179.00,
-    customerName: 'João Silva',
-    customerDocument: '123.456.789-10',
-    customerAddress: 'Rua das Flores, 123',
-    customerPhone: '(62) 99999-9999',
-    customerType: 'pessoa_fisica',
-    status: 'orcamento',
-    validUntil: "2024-01-25"
-  },
-  { 
-    id: 2, 
-    date: "2024-01-09", 
-    products: [
-      { name: "Sisal", quantity: 8, price: 30.00 }
-    ],
-    total: 240.00,
-    profit: 120.00,
-    customerName: 'Maria Santos Ltda',
-    customerDocument: '12.345.678/0001-90',
-    customerAddress: 'Av. Principal, 456',
-    customerPhone: '(62) 88888-8888',
-    customerType: 'pessoa_juridica',
-    status: 'pedido',
-    validUntil: "2024-01-24"
-  },
-];
+const mockBudgets: Budget[] = [];
 
 interface BudgetManagementProps {
   products: Product[];

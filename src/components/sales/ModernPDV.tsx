@@ -248,6 +248,7 @@ export function ModernPDV({
           quantity: item.quantity,
           price: item.price,
         })),
+        cart: cart, // Adicionando o carrinho completo para facilitar a atualização do estoque
         total,
         profit,
         paymentMethod,

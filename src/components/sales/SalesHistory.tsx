@@ -1,15 +1,17 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
-import { Calendar, ShoppingCart } from "lucide-react";
+import { Calendar, ShoppingCart, Trash2 } from "lucide-react";
 import { Sale, paymentMethods } from "./types";
 
 interface SalesHistoryProps {
   sales: Sale[];
   formatCurrency: (value: number) => string;
+  onSaleDeleted?: (saleId: string | number) => void;
 }
 
-export function SalesHistory({ sales, formatCurrency }: SalesHistoryProps) {
+export function SalesHistory({ sales, formatCurrency, onSaleDeleted }: SalesHistoryProps) {
   return (
     <Card className="p-6">
       <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
@@ -79,6 +81,22 @@ export function SalesHistory({ sales, formatCurrency }: SalesHistoryProps) {
                         <p className="text-muted-foreground">Status</p>
                         <Badge variant="success" className="text-xs">Pago</Badge>
                       </div>
+                      {onSaleDeleted && (
+                        <div>
+                          <Button 
+                            variant="destructive" 
+                            size="sm"
+                            onClick={() => {
+                              if (window.confirm('Deseja realmente deletar esta venda?')) {
+                                onSaleDeleted(sale.id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="w-3 h-3 mr-1" />
+                            Deletar
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </AccordionContent>

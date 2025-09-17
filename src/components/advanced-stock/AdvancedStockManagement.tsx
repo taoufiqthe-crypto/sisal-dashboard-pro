@@ -14,29 +14,39 @@ import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
 
 interface Product {
-  id: string;
+  id: number;
   name: string;
   stock: number;
-  min_stock: number;
+  minStock?: number;
   price: number;
-  cost_price: number;
+  cost: number;
   category: string;
 }
 
 interface StockMovement {
   id: string;
-  product_id: string;
+  product_id: number;
   type: 'in' | 'out' | 'adjustment';
   quantity: number;
   reason: string;
   created_at: string;
-  products: { name: string };
+  productName: string;
 }
 
-export const AdvancedStockManagement = () => {
-  const { user } = useAuth();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [movements, setMovements] = useState<StockMovement[]>([]);
+interface AdvancedStockManagementProps {
+  products: Product[];
+  setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
+}
+
+export const AdvancedStockManagement = ({ products, setProducts }: AdvancedStockManagementProps) => {
+  const [movements, setMovements] = useState<StockMovement[]>(() => {
+    try {
+      const stored = localStorage.getItem("stockMovements");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState('');
   const [movementData, setMovementData] = useState({
@@ -44,99 +54,91 @@ export const AdvancedStockManagement = () => {
     quantity: '',
     reason: ''
   });
+  const [manualProductName, setManualProductName] = useState('');
 
   useEffect(() => {
-    if (user) {
-      loadData();
-    }
-  }, [user]);
-
-  const loadData = async () => {
-    try {
-      const [productsData, movementsData] = await Promise.all([
-        supabase.from('products').select('*').eq('user_id', user!.id),
-        supabase.from('stock_movements').select(`
-          *,
-          products (name)
-        `).eq('user_id', user!.id).order('created_at', { ascending: false })
-      ]);
-
-      setProducts(productsData.data || []);
-      setMovements((movementsData.data || []) as StockMovement[]);
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar dados do estoque.",
-        variant: "destructive",
-      });
-    }
-  };
+    localStorage.setItem("stockMovements", JSON.stringify(movements));
+  }, [movements]);
 
   const createMovement = async () => {
-    if (!user || !selectedProduct || !movementData.quantity || !movementData.reason) {
-      toast({
-        title: "Erro",
-        description: "Preencha todos os campos.",
-        variant: "destructive",
-      });
+    let productId: number;
+    let productName: string;
+
+    if (selectedProduct) {
+      const product = products.find(p => p.id === parseInt(selectedProduct));
+      if (!product) {
+        alert("Produto não encontrado!");
+        return;
+      }
+      productId = product.id;
+      productName = product.name;
+    } else if (manualProductName.trim()) {
+      // Criar produto manual
+      const newProduct: Product = {
+        id: Date.now(),
+        name: manualProductName.trim(),
+        stock: 0,
+        minStock: 10,
+        price: 0,
+        cost: 0,
+        category: 'Manual'
+      };
+      setProducts(prev => [...prev, newProduct]);
+      productId = newProduct.id;
+      productName = newProduct.name;
+    } else {
+      alert("Selecione um produto ou digite o nome de um novo produto!");
       return;
     }
 
-    try {
-      const quantity = parseInt(movementData.quantity);
-      const product = products.find(p => p.id === selectedProduct);
-      
-      if (!product) return;
-
-      // Criar movimento
-      const { error: movementError } = await supabase.from('stock_movements').insert({
-        product_id: selectedProduct,
-        type: movementData.type,
-        quantity: quantity,
-        reason: movementData.reason,
-        user_id: user.id
-      });
-
-      if (movementError) throw movementError;
-
-      // Atualizar estoque do produto
-      let newStock = product.stock;
-      if (movementData.type === 'in') {
-        newStock += quantity;
-      } else if (movementData.type === 'out') {
-        newStock -= quantity;
-      } else { // adjustment
-        newStock = quantity;
-      }
-
-      const { error: productError } = await supabase
-        .from('products')
-        .update({ stock: Math.max(0, newStock) })
-        .eq('id', selectedProduct);
-
-      if (productError) throw productError;
-
-      toast({
-        title: "Sucesso",
-        description: "Movimentação registrada com sucesso!",
-      });
-
-      setMovementData({ type: 'in', quantity: '', reason: '' });
-      setSelectedProduct('');
-      setIsDialogOpen(false);
-      loadData();
-    } catch (error) {
-      console.error('Erro ao criar movimentação:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao registrar movimentação.",
-        variant: "destructive",
-      });
+    if (!movementData.quantity || !movementData.reason) {
+      alert("Preencha todos os campos!");
+      return;
     }
+
+    const quantity = parseInt(movementData.quantity);
+    const product = products.find(p => p.id === productId);
+    
+    if (!product) return;
+
+    // Criar movimento
+    const newMovement: StockMovement = {
+      id: Date.now().toString(),
+      product_id: productId,
+      type: movementData.type,
+      quantity,
+      reason: movementData.reason,
+      created_at: new Date().toISOString(),
+      productName
+    };
+
+    setMovements(prev => [newMovement, ...prev]);
+
+    // Atualizar estoque do produto
+    let newStock = product.stock;
+    if (movementData.type === 'in') {
+      newStock += quantity;
+    } else if (movementData.type === 'out') {
+      newStock -= quantity;
+    } else { // adjustment
+      newStock = quantity;
+    }
+
+    setProducts(prev => prev.map(p => 
+      p.id === productId 
+        ? { ...p, stock: Math.max(0, newStock) }
+        : p
+    ));
+
+    alert("Movimentação registrada com sucesso!");
+
+    setMovementData({ type: 'in', quantity: '', reason: '' });
+    setSelectedProduct('');
+    setManualProductName('');
+    setIsDialogOpen(false);
   };
 
-  const lowStockProducts = products.filter(p => p.stock <= p.min_stock);
+  const lowStockProducts = products.filter(p => p.stock <= (p.minStock || 10));
   const outOfStockProducts = products.filter(p => p.stock === 0);
 
   const getMovementIcon = (type: string) => {
@@ -181,19 +183,27 @@ export const AdvancedStockManagement = () => {
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label>Produto *</Label>
+                <Label>Produto</Label>
                 <Select value={selectedProduct} onValueChange={setSelectedProduct}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione um produto" />
                   </SelectTrigger>
                   <SelectContent>
                     {products.map(product => (
-                      <SelectItem key={product.id} value={product.id}>
+                      <SelectItem key={product.id} value={product.id.toString()}>
                         {product.name} (Estoque: {product.stock})
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div>
+                <Label>Ou digite o nome de um novo produto</Label>
+                <Input
+                  value={manualProductName}
+                  onChange={(e) => setManualProductName(e.target.value)}
+                  placeholder="Nome do produto (será criado automaticamente)"
+                />
               </div>
               <div>
                 <Label>Tipo de Movimentação *</Label>
@@ -264,7 +274,7 @@ export const AdvancedStockManagement = () => {
                 <div className="flex flex-wrap gap-2">
                   {lowStockProducts.map(product => (
                     <Badge key={product.id} variant="outline" className="border-yellow-500">
-                      {product.name} ({product.stock}/{product.min_stock})
+                      {product.name} ({product.stock}/{product.minStock || 10})
                     </Badge>
                   ))}
                 </div>
@@ -302,7 +312,7 @@ export const AdvancedStockManagement = () => {
               <div className="flex justify-between items-center">
                 <span>Valor Total em Estoque:</span>
                 <span className="font-semibold">
-                  R$ {products.reduce((total, p) => total + (p.stock * p.cost_price), 0).toFixed(2)}
+                  R$ {products.reduce((total, p) => total + (p.stock * p.cost), 0).toFixed(2)}
                 </span>
               </div>
             </div>
@@ -330,7 +340,7 @@ export const AdvancedStockManagement = () => {
                       {product.stock}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Mín: {product.min_stock}
+                      Mín: {product.minStock || 10}
                     </div>
                   </div>
                 </div>
@@ -371,7 +381,7 @@ export const AdvancedStockManagement = () => {
                   <TableCell>
                     {format(new Date(movement.created_at), 'dd/MM/yyyy HH:mm')}
                   </TableCell>
-                  <TableCell>{movement.products.name}</TableCell>
+                  <TableCell>{movement.productName}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       {getMovementIcon(movement.type)}
