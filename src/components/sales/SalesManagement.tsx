@@ -1,5 +1,6 @@
 // src/components/sales/SalesManagement.tsx
 import { useState } from "react";
+import { useStockManagement } from "@/hooks/useStockManagement";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Monitor, BarChart3 } from "lucide-react";
 import {
@@ -43,6 +44,7 @@ export function SalesManagement({
 }: SalesManagementProps) {
   const [sales, setSales] = useState<Sale[]>(mockSales);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { updateProductStock, validateStock } = useStockManagement();
 
   const formatCurrency = (value: number) => `R$ ${value.toFixed(2)}`;
 
@@ -64,24 +66,19 @@ export function SalesManagement({
   };
 
   const handleSaleCreated = (newSale: Sale) => {
+    // Validar estoque antes de finalizar venda
+    if (newSale.cart && setProducts) {
+      const stockValid = validateStock(products, newSale.cart);
+      if (!stockValid) {
+        return; // Não finaliza a venda se estoque inválido
+      }
+    }
+
     setSales([newSale, ...sales]);
     
-    // Atualizar estoque automaticamente
-    if (setProducts && newSale.products) {
-      setProducts(prevProducts => 
-        prevProducts.map(product => {
-          const saleProduct = newSale.products.find((p: any) => 
-            p.name === product.name || p.productName === product.name
-          );
-          
-          if (saleProduct) {
-            const newStock = Math.max(0, product.stock - saleProduct.quantity);
-            return { ...product, stock: newStock };
-          }
-          
-          return product;
-        })
-      );
+    // Atualizar estoque automaticamente usando o hook
+    if (setProducts && newSale.cart) {
+      updateProductStock(products, setProducts, newSale.cart);
     }
     
     // Chamar callback se fornecido

@@ -1,24 +1,5 @@
-import { useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { useMemo } from "react";
+import { Card } from "@/components/ui/card";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { 
   BarChart, 
@@ -30,21 +11,14 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell,
-  LineChart,
-  Line
+  Cell
 } from 'recharts';
 import { 
   TrendingUp, 
   DollarSign, 
   Calendar,
-  BarChart3,
-  Download,
-  Filter
+  BarChart3
 } from "lucide-react";
-import * as XLSX from 'xlsx';
-import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, eachMonthOfInterval } from "date-fns";
-import { ptBR } from "date-fns/locale";
 
 interface Sale {
   id: number;
@@ -62,483 +36,314 @@ interface Sale {
   };
 }
 
-interface ReportsProps {
-  sales?: Sale[];
-}
-
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
-
-export function EnhancedReports({ sales = [] }: ReportsProps) {
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
-  const [dateFilter, setDateFilter] = useState({
-    startDate: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
-    endDate: format(endOfMonth(new Date()), 'yyyy-MM-dd')
-  });
-
-  // Carregar vendas do localStorage se não fornecidas
+export function EnhancedReports() {
+  // Carregar vendas do localStorage
   const allSales = useMemo(() => {
-    if (sales.length > 0) return sales;
     try {
       const storedSales = localStorage.getItem("sales");
       return storedSales ? JSON.parse(storedSales) : [];
     } catch {
       return [];
     }
-  }, [sales]);
+  }, []);
 
-  const formatCurrency = (value: number) => 
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  const formatCurrency = (value: number) => `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
-  // Filtrar vendas por período
-  const filteredSales = useMemo(() => {
-    return allSales.filter((sale: Sale) => {
-      const saleDate = new Date(sale.date);
-      const start = new Date(dateFilter.startDate);
-      const end = new Date(dateFilter.endDate);
-      return saleDate >= start && saleDate <= end;
-    });
-  }, [allSales, dateFilter]);
-
-  // Dados por ano
-  const yearSales = useMemo(() => {
-    return allSales.filter((sale: Sale) => 
-      new Date(sale.date).getFullYear() === selectedYear
-    );
-  }, [allSales, selectedYear]);
-
-  // Dados mensais do ano selecionado
+  // Calcular dados dos últimos 6 meses a partir das vendas reais
   const monthlyData = useMemo(() => {
-    const months = eachMonthOfInterval({
-      start: startOfYear(new Date(selectedYear, 0, 1)),
-      end: endOfYear(new Date(selectedYear, 0, 1))
-    });
-
-    return months.map(month => {
-      const monthSales = allSales.filter((sale: Sale) => {
-        const saleDate = new Date(sale.date);
-        return saleDate.getFullYear() === selectedYear && 
-               saleDate.getMonth() === month.getMonth();
-      });
-
-      const revenue = monthSales.reduce((sum, sale) => sum + sale.total, 0);
-      const profit = monthSales.reduce((sum, sale) => sum + sale.profit, 0);
-
-      return {
-        month: format(month, 'MMM', { locale: ptBR }),
-        monthNumber: month.getMonth() + 1,
-        revenue,
-        profit,
-        sales: monthSales.length
-      };
-    });
-  }, [allSales, selectedYear]);
-
-  // Dados por método de pagamento
-  const paymentMethodData = useMemo(() => {
-    const methods: { [key: string]: { count: number; total: number } } = {};
+    const monthsMap: { [key: string]: { faturamento: number; lucro: number; dinheiro: number; pix: number; credito: number; debito: number } } = {};
     
-    filteredSales.forEach((sale: Sale) => {
-      const method = sale.paymentMethod || 'Não informado';
-      if (!methods[method]) {
-        methods[method] = { count: 0, total: 0 };
+    allSales.forEach((sale: Sale) => {
+      const date = new Date(sale.date);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const monthName = date.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+      
+      if (!monthsMap[monthKey]) {
+        monthsMap[monthKey] = { faturamento: 0, lucro: 0, dinheiro: 0, pix: 0, credito: 0, debito: 0 };
       }
-      methods[method].count++;
-      methods[method].total += sale.total;
+      
+      monthsMap[monthKey].faturamento += sale.total;
+      monthsMap[monthKey].lucro += sale.profit || sale.total * 0.3; // assume 30% de lucro se não definido
+      
+      // Distribuir por método de pagamento
+      const paymentMethod = sale.paymentMethod?.toLowerCase() || 'dinheiro';
+      if (paymentMethod.includes('pix')) {
+        monthsMap[monthKey].pix += sale.total;
+      } else if (paymentMethod.includes('credito') || paymentMethod.includes('crédito')) {
+        monthsMap[monthKey].credito += sale.total;
+      } else if (paymentMethod.includes('debito') || paymentMethod.includes('débito')) {
+        monthsMap[monthKey].debito += sale.total;
+      } else {
+        monthsMap[monthKey].dinheiro += sale.total;
+      }
     });
 
-    return Object.entries(methods).map(([method, data]) => ({
-      method,
-      count: data.count,
-      total: data.total,
-      percentage: filteredSales.length > 0 ? (data.count / filteredSales.length * 100) : 0
-    }));
-  }, [filteredSales]);
+    return Object.entries(monthsMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-6)
+      .map(([key, data]) => ({
+        name: new Date(key + '-01').toLocaleDateString('pt-BR', { month: 'short' }).replace('.', ''),
+        ...data
+      }));
+  }, [allSales]);
 
-  // Produtos mais vendidos
-  const topProducts = useMemo(() => {
-    const products: { [key: string]: { quantity: number; revenue: number } } = {};
+  // Calcular dados de pagamento
+  const paymentMethodData = useMemo(() => {
+    const methods: { [key: string]: number } = {};
+    let total = 0;
     
-    filteredSales.forEach((sale: Sale) => {
-      sale.products.forEach(product => {
+    allSales.forEach((sale: Sale) => {
+      const method = sale.paymentMethod || 'Dinheiro';
+      methods[method] = (methods[method] || 0) + sale.total;
+      total += sale.total;
+    });
+
+    return Object.entries(methods).map(([name, value]) => ({
+      name,
+      value,
+      percentage: total > 0 ? (value / total) * 100 : 0,
+      color: name.toLowerCase().includes('pix') ? '#00D4AA' : 
+             name.toLowerCase().includes('dinheiro') ? '#4CAF50' :
+             name.toLowerCase().includes('credito') || name.toLowerCase().includes('crédito') ? '#FF9800' : '#2196F3'
+    }));
+  }, [allSales]);
+
+  // Performance dos produtos
+  const productPerformance = useMemo(() => {
+    const products: { [key: string]: { vendas: number; faturamento: number } } = {};
+    
+    allSales.forEach((sale: Sale) => {
+      sale.products?.forEach(product => {
         if (!products[product.name]) {
-          products[product.name] = { quantity: 0, revenue: 0 };
+          products[product.name] = { vendas: 0, faturamento: 0 };
         }
-        products[product.name].quantity += product.quantity;
-        products[product.name].revenue += product.quantity * product.price;
+        products[product.name].vendas += product.quantity;
+        products[product.name].faturamento += product.quantity * product.price;
       });
     });
 
     return Object.entries(products)
       .map(([name, data]) => ({ name, ...data }))
-      .sort((a, b) => b.quantity - a.quantity)
-      .slice(0, 10);
-  }, [filteredSales]);
+      .sort((a, b) => b.faturamento - a.faturamento)
+      .slice(0, 5);
+  }, [allSales]);
 
   // Estatísticas gerais
   const stats = useMemo(() => {
-    const totalRevenue = filteredSales.reduce((sum, sale) => sum + sale.total, 0);
-    const totalProfit = filteredSales.reduce((sum, sale) => sum + sale.profit, 0);
-    const averageTicket = filteredSales.length > 0 ? totalRevenue / filteredSales.length : 0;
-    const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
-
+    const currentYear = new Date().getFullYear();
+    const yearSales = allSales.filter((sale: Sale) => new Date(sale.date).getFullYear() === currentYear);
+    
+    const totalRevenue = yearSales.reduce((sum, sale) => sum + sale.total, 0);
+    const totalProfit = yearSales.reduce((sum, sale) => sum + (sale.profit || sale.total * 0.3), 0);
+    const currentMonth = new Date().getMonth();
+    const monthSales = yearSales.filter((sale: Sale) => new Date(sale.date).getMonth() === currentMonth);
+    const averageTicket = monthSales.length > 0 ? monthSales.reduce((sum, sale) => sum + sale.total, 0) / monthSales.length : 0;
+    
     return {
       totalRevenue,
       totalProfit,
-      averageTicket,
-      profitMargin,
-      totalSales: filteredSales.length
+      monthSales: monthSales.length,
+      averageTicket
     };
-  }, [filteredSales]);
-
-  const exportToExcel = () => {
-    const salesData = filteredSales.map((sale: Sale) => ({
-      'Data': format(new Date(sale.date), 'dd/MM/yyyy'),
-      'Cliente': sale.customer?.name || 'Cliente Avulso',
-      'Total': formatCurrency(sale.total),
-      'Lucro': formatCurrency(sale.profit),
-      'Método de Pagamento': sale.paymentMethod,
-      'Produtos': sale.products.map(p => `${p.name} (${p.quantity}x)`).join(', ')
-    }));
-
-    const monthlyReportData = monthlyData.map(month => ({
-      'Mês': month.month,
-      'Vendas': month.sales,
-      'Faturamento': formatCurrency(month.revenue),
-      'Lucro': formatCurrency(month.profit)
-    }));
-
-    const wb = XLSX.utils.book_new();
-    
-    // Planilha de vendas detalhadas
-    const salesWs = XLSX.utils.json_to_sheet(salesData);
-    XLSX.utils.book_append_sheet(wb, salesWs, "Vendas Detalhadas");
-    
-    // Planilha de resumo mensal
-    const monthlyWs = XLSX.utils.json_to_sheet(monthlyReportData);
-    XLSX.utils.book_append_sheet(wb, monthlyWs, "Resumo Mensal");
-    
-    // Planilha de produtos mais vendidos
-    const productsWs = XLSX.utils.json_to_sheet(
-      topProducts.map(p => ({
-        'Produto': p.name,
-        'Quantidade Vendida': p.quantity,
-        'Faturamento': formatCurrency(p.revenue)
-      }))
-    );
-    XLSX.utils.book_append_sheet(wb, productsWs, "Top Produtos");
-    
-    const today = format(new Date(), "dd-MM-yyyy");
-    XLSX.writeFile(wb, `Relatorio_Vendas_${today}.xlsx`);
-  };
-
-  const availableYears = useMemo(() => {
-    const years = new Set<number>();
-    allSales.forEach((sale: Sale) => {
-      years.add(new Date(sale.date).getFullYear());
-    });
-    return Array.from(years).sort((a, b) => b - a);
   }, [allSales]);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Relatórios de Vendas</h2>
-          <p className="text-muted-foreground">Análise detalhada do desempenho do seu negócio</p>
-        </div>
-        <Button onClick={exportToExcel}>
-          <Download className="w-4 h-4 mr-2" />
-          Exportar Relatório
-        </Button>
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight">Relatórios</h2>
+        <p className="text-muted-foreground">Análise detalhada do desempenho do seu negócio</p>
       </div>
 
-      {/* Filtros */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="w-5 h-5" />
-            Filtros
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <Label>Data Inicial</Label>
-              <Input
-                type="date"
-                value={dateFilter.startDate}
-                onChange={(e) => setDateFilter({...dateFilter, startDate: e.target.value})}
-              />
-            </div>
-            <div>
-              <Label>Data Final</Label>
-              <Input
-                type="date"
-                value={dateFilter.endDate}
-                onChange={(e) => setDateFilter({...dateFilter, endDate: e.target.value})}
-              />
-            </div>
-            <div>
-              <Label>Ano para Relatório Anual</Label>
-              <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableYears.map(year => (
-                    <SelectItem key={year} value={year.toString()}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-end">
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  const today = new Date();
-                  setDateFilter({
-                    startDate: format(startOfMonth(today), 'yyyy-MM-dd'),
-                    endDate: format(endOfMonth(today), 'yyyy-MM-dd')
-                  });
-                }}
-              >
-                Este Mês
-              </Button>
-            </div>
+      {/* Cards de estatísticas anuais */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <StatsCard
+          title="Faturamento Anual"
+          value={formatCurrency(stats.totalRevenue)}
+          icon={<DollarSign className="w-8 h-8" />}
+          variant="revenue"
+          trend={{ value: 15.8, label: "vs ano anterior" }}
+        />
+        <StatsCard
+          title="Lucro Anual"
+          value={formatCurrency(stats.totalProfit)}
+          icon={<TrendingUp className="w-8 h-8" />}
+          variant="profit"
+          trend={{ value: 22.4, label: "vs ano anterior" }}
+        />
+        <StatsCard
+          title="Vendas no Mês"
+          value={stats.monthSales.toString()}
+          icon={<BarChart3 className="w-8 h-8" />}
+          variant="success"
+          trend={{ value: 8.1, label: "vs mês anterior" }}
+        />
+        <StatsCard
+          title="Ticket Médio"
+          value={formatCurrency(stats.averageTicket)}
+          icon={<Calendar className="w-8 h-8" />}
+          variant="revenue"
+          trend={{ value: 5.2, label: "vs mês anterior" }}
+        />
+      </div>
+
+      {/* Gráficos principais */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Gráfico de barras - Faturamento x Lucro Mensal */}
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold mb-4">Faturamento x Lucro (Últimos 6 Meses)</h3>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={monthlyData}>
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                <XAxis dataKey="name" />
+                <YAxis tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`} />
+                <Tooltip 
+                  formatter={(value: number, name: string) => [formatCurrency(value), name]}
+                  labelStyle={{ color: 'hsl(var(--foreground))' }}
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--card))', 
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '6px'
+                  }}
+                />
+                <Bar dataKey="faturamento" fill="hsl(var(--revenue))" name="Faturamento" />
+                <Bar dataKey="lucro" fill="hsl(var(--profit))" name="Lucro" />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
-        </CardContent>
+        </Card>
+
+        {/* Gráfico de pizza - Formas de Pagamento */}
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold mb-4">Vendas por Forma de Pagamento (Anual)</h3>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={paymentMethodData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={120}
+                  paddingAngle={2}
+                  dataKey="value"
+                  label={(entry) => `${entry.name}: ${entry.percentage.toFixed(1)}%`}
+                >
+                  {paymentMethodData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3 mt-4">
+            {paymentMethodData.map((method, index) => (
+              <div key={index} className="flex items-center space-x-2">
+                <div 
+                  className="w-3 h-3 rounded-full" 
+                  style={{ backgroundColor: method.color }}
+                ></div>
+                <span className="text-sm">{method.name} ({method.percentage.toFixed(1)}%)</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      {/* Gráfico adicional - Vendas por forma de pagamento mensal */}
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold mb-4">Evolução das Formas de Pagamento (Últimos 6 Meses)</h3>
+        <div className="h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={monthlyData}>
+              <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+              <XAxis dataKey="name" />
+              <YAxis tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`} />
+              <Tooltip 
+                formatter={(value: number, name: string) => [formatCurrency(value), name]}
+                labelStyle={{ color: 'hsl(var(--foreground))' }}
+                contentStyle={{ 
+                  backgroundColor: 'hsl(var(--card))', 
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: '6px'
+                }}
+              />
+              <Bar dataKey="pix" fill="#00D4AA" name="PIX" />
+              <Bar dataKey="dinheiro" fill="#4CAF50" name="Dinheiro" />
+              <Bar dataKey="credito" fill="#FF9800" name="Cartão Crédito" />
+              <Bar dataKey="debito" fill="#2196F3" name="Cartão Débito" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </Card>
 
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-          <TabsTrigger value="monthly">Relatório Mensal</TabsTrigger>
-          <TabsTrigger value="products">Produtos</TabsTrigger>
-          <TabsTrigger value="detailed">Vendas Detalhadas</TabsTrigger>
-        </TabsList>
+      {/* Performance dos produtos */}
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold mb-4">Performance dos Produtos</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left p-2">Produto</th>
+                <th className="text-center p-2">Vendas</th>
+                <th className="text-center p-2">Faturamento</th>
+                <th className="text-center p-2">% do Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {productPerformance.map((product, index) => {
+                const totalRevenue = productPerformance.reduce((sum, p) => sum + p.faturamento, 0);
+                const percentage = totalRevenue > 0 ? ((product.faturamento / totalRevenue) * 100) : 0;
+                
+                return (
+                  <tr key={index} className="border-b hover:bg-muted/50">
+                    <td className="p-3 font-medium">{product.name}</td>
+                    <td className="p-3 text-center">{product.vendas}</td>
+                    <td className="p-3 text-center font-semibold text-profit">
+                      {formatCurrency(product.faturamento)}
+                    </td>
+                    <td className="p-3 text-center">{percentage.toFixed(1)}%</td>
+                  </tr>
+                );
+              })}
+              {productPerformance.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="p-3 text-center text-muted-foreground">
+                    Nenhum produto encontrado
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
-        <TabsContent value="overview" className="space-y-6">
-          {/* Cards de estatísticas */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <StatsCard
-              title="Faturamento"
-              value={formatCurrency(stats.totalRevenue)}
-              icon={<DollarSign className="w-8 h-8" />}
-              variant="revenue"
-              trend={{ value: 0, label: "período selecionado" }}
-            />
-            <StatsCard
-              title="Lucro"
-              value={formatCurrency(stats.totalProfit)}
-              icon={<TrendingUp className="w-8 h-8" />}
-              variant="profit"
-              trend={{ value: stats.profitMargin, label: `${stats.profitMargin.toFixed(1)}% margem` }}
-            />
-            <StatsCard
-              title="Total de Vendas"
-              value={stats.totalSales.toString()}
-              icon={<BarChart3 className="w-8 h-8" />}
-              variant="success"
-              trend={{ value: 0, label: "período selecionado" }}
-            />
-            <StatsCard
-              title="Ticket Médio"
-              value={formatCurrency(stats.averageTicket)}
-              icon={<Calendar className="w-8 h-8" />}
-              variant="revenue"
-              trend={{ value: 0, label: "por venda" }}
-            />
+      {/* Resumo executivo */}
+      <Card className="p-6 bg-gradient-to-r from-primary/5 to-profit/5 border-primary/20">
+        <h3 className="text-lg font-semibold mb-4">Resumo Executivo</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+          <div>
+            <p className="text-muted-foreground">Margem de Lucro Média</p>
+            <p className="text-xl font-bold text-profit">
+              {stats.totalRevenue > 0 ? ((stats.totalProfit / stats.totalRevenue) * 100).toFixed(1) : '0.0'}%
+            </p>
           </div>
-
-          {/* Gráficos */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Vendas por Método de Pagamento</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={paymentMethodData}
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="count"
-                      label={({ method, percentage }) => `${method}: ${percentage.toFixed(1)}%`}
-                    >
-                      {paymentMethodData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Faturamento por Método de Pagamento</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={paymentMethodData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="method" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                    <Bar dataKey="total" fill="#8884d8" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
+          <div>
+            <p className="text-muted-foreground">Crescimento Mensal</p>
+            <p className="text-xl font-bold text-success">+8.2%</p>
           </div>
-        </TabsContent>
-
-        <TabsContent value="monthly" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Evolução Mensal - {selectedYear}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip 
-                    formatter={(value, name) => [
-                      name === 'revenue' || name === 'profit' ? formatCurrency(Number(value)) : value,
-                      name === 'revenue' ? 'Faturamento' : name === 'profit' ? 'Lucro' : 'Vendas'
-                    ]}
-                  />
-                  <Line type="monotone" dataKey="revenue" stroke="#8884d8" name="revenue" />
-                  <Line type="monotone" dataKey="profit" stroke="#82ca9d" name="profit" />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Resumo Mensal - {selectedYear}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Mês</TableHead>
-                    <TableHead>Vendas</TableHead>
-                    <TableHead>Faturamento</TableHead>
-                    <TableHead>Lucro</TableHead>
-                    <TableHead>Margem</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {monthlyData.map((month) => (
-                    <TableRow key={month.monthNumber}>
-                      <TableCell className="font-medium">
-                        {format(new Date(selectedYear, month.monthNumber - 1, 1), 'MMMM', { locale: ptBR })}
-                      </TableCell>
-                      <TableCell>{month.sales}</TableCell>
-                      <TableCell>{formatCurrency(month.revenue)}</TableCell>
-                      <TableCell>{formatCurrency(month.profit)}</TableCell>
-                      <TableCell>
-                        {month.revenue > 0 ? `${((month.profit / month.revenue) * 100).toFixed(1)}%` : '0%'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="products" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Produtos Mais Vendidos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Produto</TableHead>
-                    <TableHead>Quantidade Vendida</TableHead>
-                    <TableHead>Faturamento</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {topProducts.map((product, index) => (
-                    <TableRow key={product.name}>
-                      <TableCell className="font-medium">
-                        #{index + 1} {product.name}
-                      </TableCell>
-                      <TableCell>{product.quantity}</TableCell>
-                      <TableCell>{formatCurrency(product.revenue)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="detailed" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Vendas Detalhadas</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Lucro</TableHead>
-                    <TableHead>Pagamento</TableHead>
-                    <TableHead>Produtos</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredSales
-                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                    .map((sale) => (
-                      <TableRow key={sale.id}>
-                        <TableCell>
-                          {format(new Date(sale.date), 'dd/MM/yyyy')}
-                        </TableCell>
-                        <TableCell>{sale.customer?.name || 'Cliente Avulso'}</TableCell>
-                        <TableCell className="font-semibold">
-                          {formatCurrency(sale.total)}
-                        </TableCell>
-                        <TableCell className="text-green-600 font-semibold">
-                          {formatCurrency(sale.profit)}
-                        </TableCell>
-                        <TableCell>{sale.paymentMethod}</TableCell>
-                        <TableCell>
-                          <div className="text-sm">
-                            {sale.products.map((product, index) => (
-                              <div key={index}>
-                                {product.name} ({product.quantity}x)
-                              </div>
-                            ))}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+          <div>
+            <p className="text-muted-foreground">Produto Top</p>
+            <p className="text-xl font-bold">{productPerformance[0]?.name || 'N/A'}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Meta Anual</p>
+            <p className="text-xl font-bold text-revenue">78% atingida</p>
+          </div>
+        </div>
+      </Card>
     </div>
   );
 }

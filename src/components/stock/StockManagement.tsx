@@ -296,21 +296,21 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
                     onChange={(e) => setEntryDate(e.target.value)}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Produto</Label>
-                  <div className="flex gap-2">
-                    <select
-                      className="w-full p-2 border rounded-md"
-                      value={entryProductId}
-                      onChange={(e) => setEntryProductId(e.target.value)}
-                    >
-                      <option value="">Selecione um produto</option>
-                      {products.map(product => (
-                        <option key={product.id} value={product.id}>
-                          {product.name} (Estoque atual: {product.stock})
-                        </option>
-                      ))}
-                    </select>
+                  <div className="space-y-2">
+                   <Label>Produto</Label>
+                   <div className="flex gap-2">
+                     <select
+                       className="w-full p-2 bg-background border border-input text-foreground rounded-md focus:ring-2 focus:ring-ring focus:border-transparent"
+                       value={entryProductId}
+                       onChange={(e) => setEntryProductId(e.target.value)}
+                     >
+                       <option value="">Selecione um produto</option>
+                       {products.map(product => (
+                         <option key={product.id} value={product.id}>
+                           {product.name} (Estoque atual: {product.stock})
+                         </option>
+                       ))}
+                     </select>
                     <Button 
                       type="button" 
                       onClick={() => setShowNewProductDialog(true)}
@@ -339,6 +339,20 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
                     placeholder="Quantidade a adicionar"
                   />
                 </div>
+                {/* Custo Total Calculado */}
+                {entryCost && entryQuantity && (
+                  <div className="p-4 bg-muted rounded-lg border">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold">Custo Total:</span>
+                      <span className="text-lg font-bold text-primary">
+                        R$ {(parseFloat(entryCost) * parseInt(entryQuantity) || 0).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      {entryQuantity} unidades × R$ {parseFloat(entryCost || '0').toFixed(2)}
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Motivo (opcional)</Label>
                   <Input
@@ -426,19 +440,19 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
                 </div>
                 <div className="space-y-2">
                   <Label>Produto</Label>
-                  <div className="flex gap-2">
-                    <select
-                      className="w-full p-2 border rounded-md"
-                      value={exitProductId}
-                      onChange={(e) => setExitProductId(e.target.value)}
-                    >
-                      <option value="">Selecione um produto</option>
-                      {products.map(product => (
-                        <option key={product.id} value={product.id}>
-                          {product.name} (Estoque atual: {product.stock})
-                        </option>
-                      ))}
-                    </select>
+                   <div className="flex gap-2">
+                     <select
+                       className="w-full p-2 bg-background border border-input text-foreground rounded-md focus:ring-2 focus:ring-ring focus:border-transparent"
+                       value={exitProductId}
+                       onChange={(e) => setExitProductId(e.target.value)}
+                     >
+                       <option value="">Selecione um produto</option>
+                       {products.map(product => (
+                         <option key={product.id} value={product.id}>
+                           {product.name} (Estoque atual: {product.stock})
+                         </option>
+                       ))}
+                     </select>
                     <Button 
                       type="button" 
                       onClick={() => setShowNewProductDialog(true)}

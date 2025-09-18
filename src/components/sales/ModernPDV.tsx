@@ -12,6 +12,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -34,6 +42,8 @@ import {
   Zap,
   TrendingUp,
   Package,
+  Calendar,
+  CalendarIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -71,6 +81,9 @@ export function ModernPDV({
     price: "",
     quantity: "1"
   });
+  // Estado para data da venda reutilizável
+  const [saleDate, setSaleDate] = useState<Date>(new Date());
+  const [keepSaleDate, setKeepSaleDate] = useState(true);
 
   // Memoized filtered products for better performance
   const filteredProducts = useMemo(() => {
@@ -180,8 +193,12 @@ export function ModernPDV({
     setDiscount(0);
     setDiscountType("reais");
     setAmountPaid("");
+    // Só reseta a data se não estiver mantendo
+    if (!keepSaleDate) {
+      setSaleDate(new Date());
+    }
     toast.info("Carrinho limpo");
-  }, []);
+  }, [keepSaleDate]);
 
   const calculateSubtotal = useCallback(() => {
     return cart.reduce((sum, item) => sum + (item.quantity * item.price), 0);
@@ -242,7 +259,7 @@ export function ModernPDV({
 
       const newSale: Sale = {
         id: Date.now(),
-        date: new Date().toISOString().split("T")[0],
+        date: saleDate.toISOString().split("T")[0],
         products: cart.map(item => ({
           name: item.productName,
           quantity: item.quantity,
@@ -420,14 +437,61 @@ export function ModernPDV({
             </div>
             <h2 className="text-xl font-bold">Carrinho</h2>
             <Badge variant="secondary" className="ml-auto">{cart.length}</Badge>
-          </div>
+            </div>
 
-          {/* Customer Selection */}
-          <div>
-            <Label className="text-sm font-medium flex items-center gap-2">
-              <User className="w-4 h-4" />
-              Cliente
-            </Label>
+            {/* Date Selection */}
+            <div className="mb-4">
+              <Label className="text-sm font-medium flex items-center gap-2 mb-2">
+                <Calendar className="w-4 h-4" />
+                Data da Venda
+              </Label>
+              <div className="flex gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "flex-1 justify-start text-left font-normal",
+                        !saleDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {saleDate ? format(saleDate, "dd/MM/yyyy") : <span>Selecione a data</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={saleDate}
+                      onSelect={(date) => date && setSaleDate(date)}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                      disabled={(date) => date > new Date()}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Button
+                  variant={keepSaleDate ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setKeepSaleDate(!keepSaleDate)}
+                  className="px-3"
+                >
+                  {keepSaleDate ? "Fixar" : "Livre"}
+                </Button>
+              </div>
+              {keepSaleDate && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Data mantida para próximas vendas
+                </p>
+              )}
+            </div>
+
+            {/* Customer Selection */}
+            <div>
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <User className="w-4 h-4" />
+                Cliente
+              </Label>
             <Select 
               value={selectedCustomer?.id.toString() || ""} 
               onValueChange={(value) => {

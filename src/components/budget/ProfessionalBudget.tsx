@@ -646,18 +646,18 @@ export function ProfessionalBudget({ products, onBudgetCreated }: ProfessionalBu
                   {/* Quick Add from Products */}
                   <div className="mb-4">
                     <Label>Adicionar produtos do estoque:</Label>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mt-2 max-h-32 overflow-y-auto">
-                      {products.slice(0, 8).map(product => (
-                        <Button
-                          key={product.id}
-                          variant="outline"
-                          size="sm"
-                          onClick={() => addProductToBudget(product)}
-                          className="text-xs"
-                        >
-                          {product.name}
-                        </Button>
-                      ))}
+                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mt-2 max-h-32 overflow-y-auto border rounded-lg p-2 bg-muted/50">
+                       {products.slice(0, 8).map(product => (
+                         <Button
+                           key={product.id}
+                           variant="outline"
+                           size="sm"
+                           onClick={() => addProductToBudget(product)}
+                           className="text-xs h-8 hover:bg-primary hover:text-primary-foreground transition-colors"
+                         >
+                           {product.name}
+                         </Button>
+                       ))}
                     </div>
                   </div>
 

@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertTriangle, Package, TrendingDown, TrendingUp, History, Plus } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
@@ -66,8 +66,8 @@ export const AdvancedStockManagement = ({ products, setProducts }: AdvancedStock
 
     if (selectedProduct) {
       const product = products.find(p => p.id === parseInt(selectedProduct));
-      if (!product) {
-        alert("Produto não encontrado!");
+    if (!product) {
+        toast.error("Produto não encontrado!");
         return;
       }
       productId = product.id;
@@ -87,12 +87,12 @@ export const AdvancedStockManagement = ({ products, setProducts }: AdvancedStock
       productId = newProduct.id;
       productName = newProduct.name;
     } else {
-      alert("Selecione um produto ou digite o nome de um novo produto!");
+      toast.error("Selecione um produto ou digite o nome de um novo produto!");
       return;
     }
 
     if (!movementData.quantity || !movementData.reason) {
-      alert("Preencha todos os campos!");
+      toast.error("Preencha todos os campos!");
       return;
     }
 
@@ -130,7 +130,7 @@ export const AdvancedStockManagement = ({ products, setProducts }: AdvancedStock
         : p
     ));
 
-    alert("Movimentação registrada com sucesso!");
+    toast.success("Movimentação registrada com sucesso!");
 
     setMovementData({ type: 'in', quantity: '', reason: '' });
     setSelectedProduct('');

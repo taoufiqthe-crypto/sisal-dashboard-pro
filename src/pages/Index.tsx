@@ -56,19 +56,7 @@ const Index = () => {
   // Clientes
   const [customers, setCustomers] = useState<Customer[]>(loadCustomersFromLocalStorage);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
-
-  // Dados globais do sistema
+  // Dados globais do sistema - MOVIDO PARA ANTES DOS RETURNS CONDICIONAIS
   const [sales, setSales] = useState<any[]>(() => {
     try {
       const storedSales = localStorage.getItem("sales");
@@ -88,6 +76,18 @@ const Index = () => {
       return [];
     }
   });
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
 
   // Persistência - usando useCallback para evitar loops infinitos
   const saveToLocalStorage = useCallback((key: string, data: any) => {
