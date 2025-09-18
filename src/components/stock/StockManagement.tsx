@@ -48,6 +48,8 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
   const [entryReason, setEntryReason] = useState("");
   const [entryDate, setEntryDate] = useState(new Date().toISOString().split("T")[0]);
   const [entryCost, setEntryCost] = useState("");
+  const [entryMode, setEntryMode] = useState<"unit" | "total">("unit");
+  const [entryTotalValue, setEntryTotalValue] = useState("");
   const [showNewProductDialog, setShowNewProductDialog] = useState(false);
   const [newProductName, setNewProductName] = useState("");
   const [newProductPrice, setNewProductPrice] = useState("");
@@ -66,7 +68,14 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
     if (!product) return;
 
     const quantity = parseInt(entryQuantity);
-    const cost = parseFloat(entryCost) || product.cost;
+    let cost = product.cost;
+    
+    if (entryMode === "total" && entryTotalValue) {
+      // Calcular custo unitário baseado no valor total
+      cost = parseFloat(entryTotalValue) / quantity;
+    } else if (entryMode === "unit" && entryCost) {
+      cost = parseFloat(entryCost);
+    }
     
     // Atualizar estoque e custo do produto
     setProducts(prev => prev.map(p => 
@@ -92,6 +101,7 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
     setEntryProductId("");
     setEntryQuantity("");
     setEntryCost("");
+    setEntryTotalValue("");
     setEntryReason("");
     setEntryDate(new Date().toISOString().split("T")[0]);
     setIsEntryDialogOpen(false);
@@ -320,16 +330,58 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
                     </Button>
                   </div>
                 </div>
+                {/* Modo de entrada: Unitário ou Total */}
                 <div className="space-y-2">
-                  <Label>Custo por Unidade</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={entryCost}
-                    onChange={(e) => setEntryCost(e.target.value)}
-                    placeholder="Custo unitário"
-                  />
+                  <Label>Tipo de Entrada</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={entryMode === "unit" ? "default" : "outline"}
+                      onClick={() => setEntryMode("unit")}
+                      className="flex-1"
+                    >
+                      Valor Unitário
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={entryMode === "total" ? "default" : "outline"}
+                      onClick={() => setEntryMode("total")}
+                      className="flex-1"
+                    >
+                      Valor Total da Carga
+                    </Button>
+                  </div>
                 </div>
+                
+                {/* Campos condicionais baseados no modo */}
+                {entryMode === "unit" ? (
+                  <div className="space-y-2">
+                    <Label>Custo por Unidade</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={entryCost}
+                      onChange={(e) => setEntryCost(e.target.value)}
+                      placeholder="Custo unitário"
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label>Valor Total da Carga</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={entryTotalValue}
+                      onChange={(e) => setEntryTotalValue(e.target.value)}
+                      placeholder="Valor total pago pela carga"
+                    />
+                    {entryTotalValue && entryQuantity && (
+                      <div className="text-sm text-muted-foreground">
+                        Custo unitário calculado: R$ {(parseFloat(entryTotalValue) / parseInt(entryQuantity) || 0).toFixed(2)}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Quantidade</Label>
                   <Input
@@ -339,18 +391,44 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
                     placeholder="Quantidade a adicionar"
                   />
                 </div>
-                {/* Custo Total Calculado */}
-                {entryCost && entryQuantity && (
+                {/* Resumo da Entrada */}
+                {((entryMode === "unit" && entryCost && entryQuantity) || 
+                  (entryMode === "total" && entryTotalValue && entryQuantity)) && (
                   <div className="p-4 bg-muted rounded-lg border">
-                    <div className="flex justify-between items-center">
-                      <span className="font-semibold">Custo Total:</span>
-                      <span className="text-lg font-bold text-primary">
-                        R$ {(parseFloat(entryCost) * parseInt(entryQuantity) || 0).toFixed(2)}
-                      </span>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-semibold">Resumo da Entrada:</span>
                     </div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      {entryQuantity} unidades × R$ {parseFloat(entryCost || '0').toFixed(2)}
-                    </div>
+                    {entryMode === "unit" ? (
+                      <>
+                        <div className="flex justify-between">
+                          <span>Custo Total:</span>
+                          <span className="font-bold text-primary">
+                            R$ {(parseFloat(entryCost) * parseInt(entryQuantity) || 0).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {entryQuantity} unidades × R$ {parseFloat(entryCost || '0').toFixed(2)}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex justify-between">
+                          <span>Valor Total da Carga:</span>
+                          <span className="font-bold text-primary">
+                            R$ {parseFloat(entryTotalValue || '0').toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Custo Unitário:</span>
+                          <span className="font-semibold">
+                            R$ {(parseFloat(entryTotalValue) / parseInt(entryQuantity) || 0).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {entryQuantity} unidades
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
                 <div className="space-y-2">

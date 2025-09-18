@@ -19,6 +19,7 @@ import { SalesToday } from "./SalesToday";
 import { SalesMonth } from "./SalesMonth";
 import { SalesYear } from "./SalesYear";
 import { SalesHistory } from "./SalesHistory";
+import { SalesByPayment } from "./SalesByPayment";
 import {
   Sale,
   Product,
@@ -157,6 +158,17 @@ export function SalesManagement({
               paymentMethods={paymentMethods}
               formatCurrency={formatCurrency}
               isThisYear={isThisYear}
+            />
+          </div>
+
+          {/* Vendas por Forma de Pagamento - Mensal */}
+          <div className="mt-6">
+            <SalesByPayment
+              sales={sales}
+              paymentMethods={paymentMethods}
+              title="Vendas do Mês por Forma de Pagamento"
+              filterFn={isThisMonth}
+              formatCurrency={formatCurrency}
             />
           </div>
 

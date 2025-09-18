@@ -1,4 +1,5 @@
 import { StatsCard } from "./StatsCard";
+import { StockAlerts } from "./StockAlerts";
 import { Card } from "@/components/ui/card";
 import { 
   DollarSign, 
@@ -112,30 +113,7 @@ export function Dashboard({ products = [], sales = [], onClearAllData }: Dashboa
           </div>
         </Card>
 
-        <Card className="p-6">
-          <div className="flex items-center space-x-2 mb-4">
-            <Package className="w-5 h-5 text-warning" />
-            <h3 className="text-lg font-semibold">Produtos com Estoque Baixo</h3>
-          </div>
-          <div className="space-y-3">
-            {lowStockItems.length > 0 ? (
-              lowStockItems.slice(0, 4).map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <div>
-                    <p className="font-medium">{item.name}</p>
-                    <p className="text-sm text-muted-foreground">Mínimo: 20</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-warning">{item.stock}</p>
-                    <p className="text-xs text-muted-foreground">em estoque</p>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-muted-foreground text-center py-4">Todos os produtos com estoque adequado</p>
-            )}
-          </div>
-        </Card>
+        <StockAlerts products={products} />
 
         <Card className="p-6">
           <div className="flex items-center space-x-2 mb-4">
