@@ -54,10 +54,6 @@
     "cmdk": "^1.1.1",
     "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.6.0",
-<<<<<<< HEAD
-=======
-    "express": "^5.1.0",
->>>>>>> 61914e8fadfca8ecdccf6ffe8c86beac4043e999
     "husky": "^9.1.7",
     "input-otp": "^1.4.2",
     "jsdom": "^27.0.0",
