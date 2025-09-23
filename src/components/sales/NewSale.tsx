@@ -16,7 +16,10 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, Receipt, Calendar, CalendarIcon } from "lucide-react";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 import { Product, Sale, SaleItem, Customer, paymentMethods } from "./types";
@@ -41,7 +44,8 @@ export function NewSale({
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
   const [currentQuantity, setCurrentQuantity] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [saleDate, setSaleDate] = useState(new Date().toISOString().split("T")[0]);
+  const [saleDate, setSaleDate] = useState<Date>(new Date());
+  const [keepSaleDate, setKeepSaleDate] = useState(true);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<"dinheiro" | "pix" | "credito" | "debito">("dinheiro");
   const [amountPaid, setAmountPaid] = useState("");
 
@@ -158,6 +162,12 @@ export function NewSale({
       }
     }
 
+    // Validação adicional: se não há método de pagamento selecionado para outros métodos
+    if (!selectedPaymentMethod) {
+      toast.error("Selecione uma forma de pagamento!");
+      return;
+    }
+
     const total = calculateTotal();
     const profit = calculateProfit();
     const paid = parseFloat(amountPaid) || total;
@@ -165,7 +175,7 @@ export function NewSale({
 
     const newSale: Sale = {
       id: Date.now(),
-      date: saleDate,
+      date: saleDate.toISOString().split("T")[0],
       products: selectedProducts.map((item) => ({
         name: item.productName,
         quantity: item.quantity,
@@ -190,7 +200,10 @@ export function NewSale({
       setCurrentQuantity("");
       setSelectedCustomer(null);
       setAmountPaid("");
-      setSaleDate(new Date().toISOString().split("T")[0]);
+      // Só reseta a data se não estiver mantendo
+      if (!keepSaleDate) {
+        setSaleDate(new Date());
+      }
       setSelectedPaymentMethod("dinheiro");
       setIsAddingCustomer(false);
       setIsAddingProduct(false);
@@ -223,16 +236,51 @@ export function NewSale({
 
   return (
     <div className="space-y-4">
-      {/* Data */}
+      {/* Data da Venda */}
       <div className="space-y-2">
-        <Label htmlFor="saleDate">Data da Venda</Label>
-        <Input
-          id="saleDate"
-          type="date"
-          value={saleDate}
-          onChange={(e) => setSaleDate(e.target.value)}
-          max={new Date().toISOString().split("T")[0]}
-        />
+        <Label className="flex items-center gap-2">
+          <Calendar className="w-4 h-4" />
+          Data da Venda
+        </Label>
+        <div className="flex gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "flex-1 justify-start text-left font-normal",
+                  !saleDate && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {saleDate ? format(saleDate, "dd/MM/yyyy") : <span>Selecione a data</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <CalendarComponent
+                mode="single"
+                selected={saleDate}
+                onSelect={(date) => date && setSaleDate(date)}
+                initialFocus
+                className={cn("p-3 pointer-events-auto")}
+                disabled={(date) => date > new Date()}
+              />
+            </PopoverContent>
+          </Popover>
+          <Button
+            variant={keepSaleDate ? "default" : "outline"}
+            size="sm"
+            onClick={() => setKeepSaleDate(!keepSaleDate)}
+            className="px-3"
+          >
+            {keepSaleDate ? "Fixar" : "Livre"}
+          </Button>
+        </div>
+        {keepSaleDate && (
+          <p className="text-xs text-muted-foreground">
+            Data mantida para próximas vendas - ideal para inserir várias vendas do mesmo dia
+          </p>
+        )}
       </div>
 
       {/* Cliente */}
@@ -335,122 +383,124 @@ export function NewSale({
         </div>
       )}
 
-      {/* Formulário de produto avulso */}
-      {isAddingProduct && (
-        <div className="p-4 border rounded-lg space-y-3">
-          <h4 className="font-semibold">Produto Avulso</h4>
-          <Input
-            placeholder="Nome do produto"
-            value={newProductName}
-            onChange={(e) => setNewProductName(e.target.value)}
-          />
+      {/* Seleção de Produto ou Produto Avulso */}
+      <div className="space-y-4">
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant={!isAddingProduct ? "default" : "outline"}
+            onClick={() => {
+              setIsAddingProduct(false);
+              setNewProductName("");
+              setNewProductPrice("");
+              setNewProductCost("");
+            }}
+            className="flex-1"
+          >
+            Produto Cadastrado
+          </Button>
+          <Button
+            type="button"
+            variant={isAddingProduct ? "default" : "outline"}
+            onClick={() => setIsAddingProduct(true)}
+            className="flex-1"
+          >
+            Produto Avulso
+          </Button>
+        </div>
+
+        {!isAddingProduct ? (
+          /* Seleção de Produto Cadastrado */
           <div className="flex space-x-2">
-            <Input
-              placeholder="Preço (R$)"
-              type="number"
-              step="0.01"
-              value={newProductPrice}
-              onChange={(e) => setNewProductPrice(e.target.value)}
-            />
-            <Input
-              placeholder="Custo (R$)"
-              type="number"
-              step="0.01"
-              value={newProductCost}
-              onChange={(e) => setNewProductCost(e.target.value)}
-            />
-            <Input
-              type="number"
-              placeholder="Qtd"
-              value={currentQuantity}
-              onChange={(e) => setCurrentQuantity(e.target.value)}
-            />
+            <div className="flex-1">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between"
+                  >
+                    {currentProduct ? currentProduct.name : "Selecione um produto"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Buscar produto..." />
+                    <CommandList>
+                      <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
+                      <CommandGroup>
+                        {products.map((product) => (
+                          <CommandItem
+                            key={product.id}
+                            onSelect={() => setCurrentProduct(product)}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${
+                                currentProduct?.id === product.id
+                                  ? "opacity-100"
+                                  : "opacity-0"
+                              }`}
+                            />
+                            {product.name} — {formatCurrency(product.price)}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="w-24">
+              <Input
+                type="number"
+                placeholder="Qtd"
+                value={currentQuantity}
+                onChange={(e) => setCurrentQuantity(e.target.value)}
+              />
+            </div>
+            <Button
+              onClick={addProductToSale}
+              disabled={!currentProduct || !currentQuantity}
+            >
+              Adicionar
+            </Button>
           </div>
+        ) : (
+          /* Formulário Produto Avulso */
           <div className="flex space-x-2">
+            <div className="flex-1">
+              <Input
+                placeholder="Nome do produto"
+                value={newProductName}
+                onChange={(e) => setNewProductName(e.target.value)}
+              />
+            </div>
+            <div className="w-28">
+              <Input
+                placeholder="Preço (R$)"
+                type="number"
+                step="0.01"
+                value={newProductPrice}
+                onChange={(e) => setNewProductPrice(e.target.value)}
+              />
+            </div>
+            <div className="w-20">
+              <Input
+                type="number"
+                placeholder="Qtd"
+                value={currentQuantity}
+                onChange={(e) => setCurrentQuantity(e.target.value)}
+              />
+            </div>
             <Button
               onClick={addManualProductToSale}
               disabled={!newProductName || !newProductPrice || !currentQuantity}
             >
-              Adicionar à Venda
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsAddingProduct(false);
-                setNewProductName("");
-                setNewProductPrice("");
-                setNewProductCost("");
-              }}
-            >
-              Cancelar
+              Adicionar
             </Button>
           </div>
-        </div>
-      )}
-
-      {/* Seleção de Produto */}
-      <div className="flex space-x-2">
-        <div className="flex-1">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                role="combobox"
-                className="w-full justify-between"
-              >
-                {currentProduct ? currentProduct.name : "Selecione um produto"}
-                <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[300px] p-0">
-              <Command>
-                <CommandInput placeholder="Buscar produto..." />
-                <CommandList>
-                  <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
-                  <CommandGroup>
-                    {products.map((product) => (
-                      <CommandItem
-                        key={product.id}
-                        onSelect={() => setCurrentProduct(product)}
-                      >
-                        <Check
-                          className={`mr-2 h-4 w-4 ${
-                            currentProduct?.id === product.id
-                              ? "opacity-100"
-                              : "opacity-0"
-                          }`}
-                        />
-                        {product.name} — {formatCurrency(product.price)}
-                      </CommandItem>
-                    ))}
-
-                    {/* opção para adicionar produto avulso */}
-                    <CommandItem
-                      onSelect={() => setIsAddingProduct(true)}
-                      className="text-primary cursor-pointer"
-                    >
-                      + Adicionar produto avulso
-                    </CommandItem>
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-        </div>
-        <div className="w-24">
-          <Input
-            type="number"
-            placeholder="Qtd"
-            value={currentQuantity}
-            onChange={(e) => setCurrentQuantity(e.target.value)}
-          />
-        </div>
-        <Button
-          onClick={addProductToSale}
-          disabled={!currentProduct || !currentQuantity}
-        >
-          Adicionar
-        </Button>
+        )}
       </div>
 
       {/* Lista de produtos adicionados */}
@@ -549,8 +599,10 @@ export function NewSale({
         <Button
           onClick={finalizeSale}
           disabled={selectedProducts.length === 0}
+          className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md font-semibold shadow-lg"
         >
-          Finalizar Venda
+          <Receipt className="w-4 h-4 mr-2" />
+          Finalizar Venda ({formatCurrency(calculateTotal())})
         </Button>
       </div>
     </div>

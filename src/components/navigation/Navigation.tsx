@@ -36,6 +36,7 @@ const navigationItems = [
   { id: "customers", label: "Clientes", icon: User },
   { id: "suppliers", label: "Fornecedores", icon: Building2 },
   { id: "budget", label: "Orçamentos", icon: BarChart3 },
+  { id: "expenses", label: "Despesas", icon: CreditCard },
   { id: "withdrawals", label: "Retiradas", icon: DollarSign },
   { id: "reports", label: "Relatórios", icon: BarChart3 },
   { id: "manufacturing", label: "Fabricação", icon: Cog },

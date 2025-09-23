@@ -47,6 +47,13 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
   const [entryQuantity, setEntryQuantity] = useState("");
   const [entryReason, setEntryReason] = useState("");
   const [entryDate, setEntryDate] = useState(new Date().toISOString().split("T")[0]);
+  const [entryCost, setEntryCost] = useState("");
+  const [entryMode, setEntryMode] = useState<"unit" | "total">("unit");
+  const [entryTotalValue, setEntryTotalValue] = useState("");
+  const [showNewProductDialog, setShowNewProductDialog] = useState(false);
+  const [newProductName, setNewProductName] = useState("");
+  const [newProductPrice, setNewProductPrice] = useState("");
+  const [newProductCategory, setNewProductCategory] = useState("");
   
   // Estados para saída de estoque
   const [exitProductId, setExitProductId] = useState("");
@@ -61,11 +68,19 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
     if (!product) return;
 
     const quantity = parseInt(entryQuantity);
+    let cost = product.cost;
     
-    // Atualizar estoque do produto
+    if (entryMode === "total" && entryTotalValue) {
+      // Calcular custo unitário baseado no valor total
+      cost = parseFloat(entryTotalValue) / quantity;
+    } else if (entryMode === "unit" && entryCost) {
+      cost = parseFloat(entryCost);
+    }
+    
+    // Atualizar estoque e custo do produto
     setProducts(prev => prev.map(p => 
       p.id === product.id 
-        ? { ...p, stock: p.stock + quantity }
+        ? { ...p, stock: p.stock + quantity, cost: cost }
         : p
     ));
 
@@ -77,7 +92,7 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
       type: "entrada",
       quantity,
       date: entryDate,
-      reason: entryReason || "Entrada de estoque"
+      reason: entryReason || `Entrada de estoque - Custo: R$ ${cost.toFixed(2)}`
     };
 
     setMovements(prev => [newMovement, ...prev]);
@@ -85,9 +100,38 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
     // Limpar formulário
     setEntryProductId("");
     setEntryQuantity("");
+    setEntryCost("");
+    setEntryTotalValue("");
     setEntryReason("");
     setEntryDate(new Date().toISOString().split("T")[0]);
     setIsEntryDialogOpen(false);
+  };
+
+  const handleNewProduct = () => {
+    if (!newProductName.trim() || !newProductPrice || !newProductCategory.trim()) {
+      alert("Preencha todos os campos do produto!");
+      return;
+    }
+
+    const newProduct = {
+      id: Date.now(),
+      name: newProductName.trim(),
+      price: parseFloat(newProductPrice),
+      cost: parseFloat(newProductPrice) * 0.7, // 30% de margem por padrão
+      stock: 0,
+      category: newProductCategory.trim(),
+    };
+
+    setProducts(prev => [...prev, newProduct]);
+    setEntryProductId(newProduct.id.toString());
+    
+    // Limpar formulário
+    setNewProductName("");
+    setNewProductPrice("");
+    setNewProductCategory("");
+    setShowNewProductDialog(false);
+    
+    alert("Produto criado com sucesso!");
   };
 
   const handleStockExit = () => {
@@ -262,21 +306,82 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
                     onChange={(e) => setEntryDate(e.target.value)}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Produto</Label>
-                  <select
-                    className="w-full p-2 border rounded-md"
-                    value={entryProductId}
-                    onChange={(e) => setEntryProductId(e.target.value)}
-                  >
-                    <option value="">Selecione um produto</option>
-                    {products.map(product => (
-                      <option key={product.id} value={product.id}>
-                        {product.name} (Estoque atual: {product.stock})
-                      </option>
-                    ))}
-                  </select>
+                  <div className="space-y-2">
+                   <Label>Produto</Label>
+                   <div className="flex gap-2">
+                     <select
+                       className="w-full p-2 bg-background border border-input text-foreground rounded-md focus:ring-2 focus:ring-ring focus:border-transparent"
+                       value={entryProductId}
+                       onChange={(e) => setEntryProductId(e.target.value)}
+                     >
+                       <option value="">Selecione um produto</option>
+                       {products.map(product => (
+                         <option key={product.id} value={product.id}>
+                           {product.name} (Estoque atual: {product.stock})
+                         </option>
+                       ))}
+                     </select>
+                    <Button 
+                      type="button" 
+                      onClick={() => setShowNewProductDialog(true)}
+                      className="whitespace-nowrap"
+                    >
+                      Novo Produto
+                    </Button>
+                  </div>
                 </div>
+                {/* Modo de entrada: Unitário ou Total */}
+                <div className="space-y-2">
+                  <Label>Tipo de Entrada</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={entryMode === "unit" ? "default" : "outline"}
+                      onClick={() => setEntryMode("unit")}
+                      className="flex-1"
+                    >
+                      Valor Unitário
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={entryMode === "total" ? "default" : "outline"}
+                      onClick={() => setEntryMode("total")}
+                      className="flex-1"
+                    >
+                      Valor Total da Carga
+                    </Button>
+                  </div>
+                </div>
+                
+                {/* Campos condicionais baseados no modo */}
+                {entryMode === "unit" ? (
+                  <div className="space-y-2">
+                    <Label>Custo por Unidade</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={entryCost}
+                      onChange={(e) => setEntryCost(e.target.value)}
+                      placeholder="Custo unitário"
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label>Valor Total da Carga</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={entryTotalValue}
+                      onChange={(e) => setEntryTotalValue(e.target.value)}
+                      placeholder="Valor total pago pela carga"
+                    />
+                    {entryTotalValue && entryQuantity && (
+                      <div className="text-sm text-muted-foreground">
+                        Custo unitário calculado: R$ {(parseFloat(entryTotalValue) / parseInt(entryQuantity) || 0).toFixed(2)}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Quantidade</Label>
                   <Input
@@ -286,6 +391,46 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
                     placeholder="Quantidade a adicionar"
                   />
                 </div>
+                {/* Resumo da Entrada */}
+                {((entryMode === "unit" && entryCost && entryQuantity) || 
+                  (entryMode === "total" && entryTotalValue && entryQuantity)) && (
+                  <div className="p-4 bg-muted rounded-lg border">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-semibold">Resumo da Entrada:</span>
+                    </div>
+                    {entryMode === "unit" ? (
+                      <>
+                        <div className="flex justify-between">
+                          <span>Custo Total:</span>
+                          <span className="font-bold text-primary">
+                            R$ {(parseFloat(entryCost) * parseInt(entryQuantity) || 0).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {entryQuantity} unidades × R$ {parseFloat(entryCost || '0').toFixed(2)}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex justify-between">
+                          <span>Valor Total da Carga:</span>
+                          <span className="font-bold text-primary">
+                            R$ {parseFloat(entryTotalValue || '0').toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Custo Unitário:</span>
+                          <span className="font-semibold">
+                            R$ {(parseFloat(entryTotalValue) / parseInt(entryQuantity) || 0).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {entryQuantity} unidades
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Motivo (opcional)</Label>
                   <Input
@@ -300,6 +445,51 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
                   </Button>
                   <Button onClick={handleStockEntry}>
                     Registrar Entrada
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Dialog para Novo Produto */}
+          <Dialog open={showNewProductDialog} onOpenChange={setShowNewProductDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Novo Produto</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Nome do Produto</Label>
+                  <Input
+                    value={newProductName}
+                    onChange={(e) => setNewProductName(e.target.value)}
+                    placeholder="Nome do produto"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Preço de Venda</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={newProductPrice}
+                    onChange={(e) => setNewProductPrice(e.target.value)}
+                    placeholder="Preço de venda"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Categoria</Label>
+                  <Input
+                    value={newProductCategory}
+                    onChange={(e) => setNewProductCategory(e.target.value)}
+                    placeholder="Categoria do produto"
+                  />
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button variant="outline" onClick={() => setShowNewProductDialog(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleNewProduct}>
+                    Criar Produto
                   </Button>
                 </div>
               </div>
@@ -328,18 +518,27 @@ export function StockManagement({ products, setProducts, sales = [] }: StockMana
                 </div>
                 <div className="space-y-2">
                   <Label>Produto</Label>
-                  <select
-                    className="w-full p-2 border rounded-md"
-                    value={exitProductId}
-                    onChange={(e) => setExitProductId(e.target.value)}
-                  >
-                    <option value="">Selecione um produto</option>
-                    {products.map(product => (
-                      <option key={product.id} value={product.id}>
-                        {product.name} (Estoque atual: {product.stock})
-                      </option>
-                    ))}
-                  </select>
+                   <div className="flex gap-2">
+                     <select
+                       className="w-full p-2 bg-background border border-input text-foreground rounded-md focus:ring-2 focus:ring-ring focus:border-transparent"
+                       value={exitProductId}
+                       onChange={(e) => setExitProductId(e.target.value)}
+                     >
+                       <option value="">Selecione um produto</option>
+                       {products.map(product => (
+                         <option key={product.id} value={product.id}>
+                           {product.name} (Estoque atual: {product.stock})
+                         </option>
+                       ))}
+                     </select>
+                    <Button 
+                      type="button" 
+                      onClick={() => setShowNewProductDialog(true)}
+                      className="whitespace-nowrap"
+                    >
+                      Novo Produto
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Quantidade</Label>

@@ -8,6 +8,7 @@ export interface Product {
   description?: string;
   barcode?: string;
   image?: string;
+  minStock?: number;
 }
 
 export interface SaleItem {
@@ -27,6 +28,8 @@ export interface Customer {
   city?: string;
   state?: string;
   zipCode?: string;
+  neighborhood?: string;
+  complement?: string;
 }
 
 export interface Sale {
@@ -40,11 +43,14 @@ export interface Sale {
   cart?: SaleItem[]; // Adicionado para facilitar atualização do estoque
   total: number;
   profit: number;
-  paymentMethod: "dinheiro" | "pix" | "credito" | "debito";
+  paymentMethod: string; // Changed to string for flexibility
   amountPaid: number;
   change: number;
-  status: "pago" | "pendente";
+  status: "pago" | "pendente" | "completed";
   customer: Customer;
+  discount?: number; // Added discount field
+  operatorId?: string;
+  operatorName?: string;
 }
 
 export interface Budget {
