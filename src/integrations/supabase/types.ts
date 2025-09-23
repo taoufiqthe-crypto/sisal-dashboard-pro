@@ -43,6 +43,7 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+<<<<<<< HEAD
       }
       budgets: {
         Row: {
@@ -102,6 +103,8 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+=======
+>>>>>>> 61914e8fadfca8ecdccf6ffe8c86beac4043e999
       }
       cash_flow: {
         Row: {
