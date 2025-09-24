@@ -1,9 +1,6 @@
 import { useState, useEffect } from "react";
-<<<<<<< HEAD
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-=======
->>>>>>> 61914e8fadfca8ecdccf6ffe8c86beac4043e999
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -102,20 +99,9 @@ const paymentMethods = [
 ];
 
 export function ExpensesManagement() {
-<<<<<<< HEAD
   const { user } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-=======
-  const [expenses, setExpenses] = useState<Expense[]>(() => {
-    try {
-      const stored = localStorage.getItem("expenses");
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
->>>>>>> 61914e8fadfca8ecdccf6ffe8c86beac4043e999
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -132,7 +118,6 @@ export function ExpensesManagement() {
   });
 
   useEffect(() => {
-<<<<<<< HEAD
     if (user) {
       loadExpenses();
     }
@@ -169,10 +154,6 @@ export function ExpensesManagement() {
       setIsLoading(false);
     }
   };
-=======
-    localStorage.setItem("expenses", JSON.stringify(expenses));
-  }, [expenses]);
->>>>>>> 61914e8fadfca8ecdccf6ffe8c86beac4043e999
 
   const resetForm = () => {
     setFormData({
@@ -189,17 +170,12 @@ export function ExpensesManagement() {
     setEditingExpense(null);
   };
 
-<<<<<<< HEAD
   const handleSave = async () => {
-=======
-  const handleSave = () => {
->>>>>>> 61914e8fadfca8ecdccf6ffe8c86beac4043e999
     if (!formData.category || !formData.description || !formData.amount) {
       toast.error("Preencha todos os campos obrigatórios!");
       return;
     }
 
-<<<<<<< HEAD
     try {
       const expenseData = {
         user_id: user!.id,
@@ -237,31 +213,6 @@ export function ExpensesManagement() {
       console.error('Erro ao salvar despesa:', error);
       toast.error('Erro ao salvar despesa');
     }
-=======
-    const expenseData: Expense = {
-      id: editingExpense?.id || Date.now(),
-      date: formData.date,
-      category: formData.category,
-      description: formData.description,
-      amount: parseFloat(formData.amount),
-      paymentMethod: formData.paymentMethod,
-      supplier: formData.supplier || undefined,
-      dueDate: formData.dueDate || undefined,
-      status: formData.status,
-      notes: formData.notes || undefined,
-    };
-
-    if (editingExpense) {
-      setExpenses(prev => prev.map(exp => exp.id === editingExpense.id ? expenseData : exp));
-      toast.success("Despesa atualizada com sucesso!");
-    } else {
-      setExpenses(prev => [expenseData, ...prev]);
-      toast.success("Despesa cadastrada com sucesso!");
-    }
-
-    resetForm();
-    setIsDialogOpen(false);
->>>>>>> 61914e8fadfca8ecdccf6ffe8c86beac4043e999
   };
 
   const handleEdit = (expense: Expense) => {
@@ -280,7 +231,6 @@ export function ExpensesManagement() {
     setIsDialogOpen(true);
   };
 
-<<<<<<< HEAD
   const handleDelete = async (id: number) => {
     if (window.confirm("Tem certeza que deseja excluir esta despesa?")) {
       try {
@@ -297,12 +247,6 @@ export function ExpensesManagement() {
         console.error('Erro ao excluir despesa:', error);
         toast.error('Erro ao excluir despesa');
       }
-=======
-  const handleDelete = (id: number) => {
-    if (window.confirm("Tem certeza que deseja excluir esta despesa?")) {
-      setExpenses(prev => prev.filter(exp => exp.id !== id));
-      toast.success("Despesa excluída com sucesso!");
->>>>>>> 61914e8fadfca8ecdccf6ffe8c86beac4043e999
     }
   };
 

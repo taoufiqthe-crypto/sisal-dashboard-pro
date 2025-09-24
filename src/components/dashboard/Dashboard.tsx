@@ -1,9 +1,6 @@
 import { StatsCard } from "./StatsCard";
 import { StockAlerts } from "./StockAlerts";
-<<<<<<< HEAD
 import { QuickActions } from "./QuickActions";
-=======
->>>>>>> 61914e8fadfca8ecdccf6ffe8c86beac4043e999
 import { Card } from "@/components/ui/card";
 import { 
   DollarSign, 

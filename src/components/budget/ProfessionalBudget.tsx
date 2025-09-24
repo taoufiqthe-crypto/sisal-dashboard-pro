@@ -545,21 +545,22 @@ export function ProfessionalBudget({ products, onBudgetCreated }: ProfessionalBu
         validUntil: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
       };
 
-      // Salvar no localStorage para compatibilidade
-      const storedBudgets = JSON.parse(localStorage.getItem('budgets') || '[]');
-      storedBudgets.unshift(budget);
-      localStorage.setItem('budgets', JSON.stringify(storedBudgets));
-
-      if (onBudgetCreated) {
+      // Usar budgetService para salvar no Supabase
+      const { budgetService } = await import('@/services/budgetService');
+      const success = await budgetService.createBudget(budget);
+      
+      if (success && onBudgetCreated) {
         onBudgetCreated(budget);
       }
 
-      toast.success("Orçamento salvo com sucesso!", {
-        description: `Orçamento #${budget.budgetNumber} criado para ${customerData.name}`
-      });
-      
-      setIsDialogOpen(false);
-      resetForm();
+      if (success) {
+        toast.success("Orçamento salvo com sucesso!", {
+          description: `Orçamento #${budget.budgetNumber} criado para ${customerData.name}`
+        });
+        
+        setIsDialogOpen(false);
+        resetForm();
+      }
     } catch (error) {
       console.error('Erro ao salvar orçamento:', error);
       toast.error("Erro ao salvar orçamento. Tente novamente.");
@@ -594,7 +595,7 @@ export function ProfessionalBudget({ products, onBudgetCreated }: ProfessionalBu
               Novo Orçamento
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle>Novo Orçamento Profissional</DialogTitle>
               <DialogDescription>
@@ -602,7 +603,7 @@ export function ProfessionalBudget({ products, onBudgetCreated }: ProfessionalBu
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-6">
+            <div className="space-y-6 max-h-[calc(85vh-120px)] overflow-y-auto pr-2">
               {/* Customer Data */}
               <Card>
                 <CardHeader>
@@ -808,7 +809,7 @@ export function ProfessionalBudget({ products, onBudgetCreated }: ProfessionalBu
               </Card>
 
               {/* Actions */}
-              <div className="flex gap-3 justify-end">
+              <div className="sticky bottom-0 bg-background flex gap-3 justify-end pt-4 border-t">
                 <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Cancelar
                 </Button>

@@ -1,10 +1,7 @@
 // src/components/sales/SalesManagement.tsx
 import { useState } from "react";
 import { useStockManagement } from "@/hooks/useStockManagement";
-<<<<<<< HEAD
 import { useSalesData } from "@/hooks/useSalesData";
-=======
->>>>>>> 61914e8fadfca8ecdccf6ffe8c86beac4043e999
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Monitor, BarChart3, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -25,11 +22,8 @@ import { SalesMonth } from "./SalesMonth";
 import { SalesYear } from "./SalesYear";
 import { SalesHistory } from "./SalesHistory";
 import { SalesByPayment } from "./SalesByPayment";
-<<<<<<< HEAD
 import { SalesAnalytics } from "./SalesAnalytics";
 import { DataImporter } from "../imports/DataImporter";
-=======
->>>>>>> 61914e8fadfca8ecdccf6ffe8c86beac4043e999
 import {
   Sale,
   Product,
@@ -77,7 +71,6 @@ export function SalesManagement({
     return d.getFullYear() === now.getFullYear();
   };
 
-<<<<<<< HEAD
   const handleSaleCreated = async (newSale: Sale) => {
     try {
       // Validar estoque antes de finalizar venda
@@ -116,27 +109,6 @@ export function SalesManagement({
     } catch (error) {
       console.error('Erro ao processar venda:', error);
       toast.error("Erro ao processar venda");
-=======
-  const handleSaleCreated = (newSale: Sale) => {
-    // Validar estoque antes de finalizar venda
-    if (newSale.cart && setProducts) {
-      const stockValid = validateStock(products, newSale.cart);
-      if (!stockValid) {
-        return; // Não finaliza a venda se estoque inválido
-      }
-    }
-
-    setSales([newSale, ...sales]);
-    
-    // Atualizar estoque automaticamente usando o hook
-    if (setProducts && newSale.cart) {
-      updateProductStock(products, setProducts, newSale.cart);
-    }
-    
-    // Chamar callback se fornecido
-    if (onSaleCreated) {
-      onSaleCreated(newSale);
->>>>>>> 61914e8fadfca8ecdccf6ffe8c86beac4043e999
     }
   };
 
@@ -179,41 +151,30 @@ export function SalesManagement({
         <TabsContent value="reports" className="space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="text-2xl font-bold">Relatórios de Vendas</h3>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <PlusCircle className="w-4 h-4 mr-2" />
-                  Nova Venda Manual
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Nova Venda Manual</DialogTitle>
-                </DialogHeader>
-                <NewSale
-                  products={products}
-                  customers={customers}
-                  setCustomers={setCustomers}
-                  onSaleCreated={handleSaleCreated}
-                  onClose={() => {}}
-                />
-              </DialogContent>
-            </Dialog>
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <PlusCircle className="w-4 h-4 mr-2" />
+                    Nova Venda Manual
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Nova Venda Manual</DialogTitle>
+                  </DialogHeader>
+                  <NewSale
+                    products={products}
+                    customers={customers}
+                    setCustomers={setCustomers}
+                    onSaleCreated={handleSaleCreated}
+                    onClose={() => setIsDialogOpen(false)}
+                  />
+                </DialogContent>
+              </Dialog>
           </div>
 
           {/* Componente de Analytics Completo */}
           <SalesAnalytics sales={sales} />
-
-          {/* Vendas por Forma de Pagamento - Mensal */}
-          <div className="mt-6">
-            <SalesByPayment
-              sales={sales}
-              paymentMethods={paymentMethods}
-              title="Vendas do Mês por Forma de Pagamento"
-              filterFn={isThisMonth}
-              formatCurrency={formatCurrency}
-            />
-          </div>
 
           <SalesHistory 
             sales={sales} 

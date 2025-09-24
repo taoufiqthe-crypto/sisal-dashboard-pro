@@ -19,15 +19,12 @@ import { BackupRestore } from "@/components/backup/BackupRestore";
 import { FinancialManagement } from "@/components/financial/FinancialManagement";
 import { AdvancedStockManagement } from "@/components/advanced-stock/AdvancedStockManagement";
 import { ExpensesManagement } from "@/components/expenses/ExpensesManagement";
-<<<<<<< HEAD
 import { OfflineIndicator } from "@/components/system/OfflineIndicator";
 import { PerformanceMonitor } from "@/components/system/PerformanceMonitor";
 import { AdvancedReports } from "@/components/reports/AdvancedReports";
 import { OperatorLogin } from "@/components/auth/OperatorLogin";
 import { RealTimeMetrics } from "@/components/dashboard/RealTimeMetrics";
 import { SequentialNumbers } from "@/components/sales/SequentialNumbers";
-=======
->>>>>>> 61914e8fadfca8ecdccf6ffe8c86beac4043e999
 
 // ✅ importamos os mocks e tipos
 import { mockProducts, Product, mockCustomers, Customer } from "@/components/sales";
@@ -82,33 +79,9 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [products, setProducts] = useState<Product[]>(loadProductsFromLocalStorage);
   const [customers, setCustomers] = useState<Customer[]>(loadCustomersFromLocalStorage);
-<<<<<<< HEAD
   const [sales, setSales] = useState<any[]>(getInitialSales);
   const [productions, setProductions] = useState<any[]>(getInitialProductions);
   const [currentOperator, setCurrentOperator] = useState<any>(null);
-=======
-
-  // Dados globais do sistema
-  const [sales, setSales] = useState<any[]>(() => {
-    try {
-      const storedSales = localStorage.getItem("sales");
-      return storedSales ? JSON.parse(storedSales) : [];
-    } catch (error) {
-      console.error("Failed to load sales from localStorage", error);
-      return [];
-    }
-  });
-
-  const [productions, setProductions] = useState<any[]>(() => {
-    try {
-      const storedProductions = localStorage.getItem("productions");
-      return storedProductions ? JSON.parse(storedProductions) : [];
-    } catch (error) {
-      console.error("Failed to load productions from localStorage", error);
-      return [];
-    }
-  });
->>>>>>> 61914e8fadfca8ecdccf6ffe8c86beac4043e999
 
   // Persistência - usando useCallback para evitar loops infinitos
   const saveToLocalStorage = useCallback((key: string, data: any) => {
@@ -181,7 +154,6 @@ const Index = () => {
     }
   }, [products]);
 
-<<<<<<< HEAD
   // Função para lidar com ações rápidas do dashboard
   const handleQuickAction = useCallback((action: string) => {
     switch (action) {
@@ -208,8 +180,6 @@ const Index = () => {
     }
   }, []);
 
-=======
->>>>>>> 61914e8fadfca8ecdccf6ffe8c86beac4043e999
   // Função para limpar todos os dados do sistema
   const clearAllData = useCallback(() => {
     if (window.confirm("⚠️ ATENÇÃO! Esta ação irá apagar TODOS os dados do sistema (produtos, vendas, clientes, estoque, produção). Esta ação NÃO pode ser desfeita. Tem certeza?")) {
@@ -222,22 +192,7 @@ const Index = () => {
     }
   }, []);
 
-<<<<<<< HEAD
   // Effects for persistence
-=======
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
-
->>>>>>> 61914e8fadfca8ecdccf6ffe8c86beac4043e999
   useEffect(() => {
     saveToLocalStorage("products", products);
   }, [products, saveToLocalStorage]);
@@ -254,7 +209,6 @@ const Index = () => {
     saveToLocalStorage("productions", productions);
   }, [productions, saveToLocalStorage]);
 
-<<<<<<< HEAD
   // Loading and auth checks after all hooks
   if (loading) {
     return (
@@ -268,8 +222,6 @@ const Index = () => {
     return <Navigate to="/auth" replace />;
   }
 
-=======
->>>>>>> 61914e8fadfca8ecdccf6ffe8c86beac4043e999
   // Renderização
   const renderContent = () => {
     switch (activeTab) {
