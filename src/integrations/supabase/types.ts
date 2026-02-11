@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+    PostgrestVersion: "14.1"
   }
   public: {
     Tables: {
@@ -223,12 +223,75 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
+        Relationships: []
+      }
+      invoices: {
+        Row: {
+          created_at: string
+          customer_address: string | null
+          customer_cpf_cnpj: string | null
+          customer_email: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          discount: number | null
+          id: string
+          invoice_number: string
+          items: Json
+          notes: string | null
+          payment_method: string | null
+          sale_id: string | null
+          status: string
+          subtotal: number
+          total: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_address?: string | null
+          customer_cpf_cnpj?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          discount?: number | null
+          id?: string
+          invoice_number: string
+          items?: Json
+          notes?: string | null
+          payment_method?: string | null
+          sale_id?: string | null
+          status?: string
+          subtotal?: number
+          total?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_address?: string | null
+          customer_cpf_cnpj?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          discount?: number | null
+          id?: string
+          invoice_number?: string
+          items?: Json
+          notes?: string | null
+          payment_method?: string | null
+          sale_id?: string | null
+          status?: string
+          subtotal?: number
+          total?: number
+          updated_at?: string
+          user_id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "expenses_supplier_id_fkey"
-            columns: ["supplier_id"]
+            foreignKeyName: "invoices_sale_id_fkey"
+            columns: ["sale_id"]
             isOneToOne: false
-            referencedRelation: "suppliers"
+            referencedRelation: "sales"
             referencedColumns: ["id"]
           },
         ]
@@ -503,7 +566,7 @@ export type Database = {
           created_at: string
           id: string
           product_name: string
-          purchase_id: string
+          purchase_id: string | null
           quantity: number
           total_price: number
           unit_price: number
@@ -512,7 +575,7 @@ export type Database = {
           created_at?: string
           id?: string
           product_name: string
-          purchase_id: string
+          purchase_id?: string | null
           quantity?: number
           total_price?: number
           unit_price?: number
@@ -521,7 +584,7 @@ export type Database = {
           created_at?: string
           id?: string
           product_name?: string
-          purchase_id?: string
+          purchase_id?: string | null
           quantity?: number
           total_price?: number
           unit_price?: number
@@ -543,10 +606,10 @@ export type Database = {
           due_date: string | null
           id: string
           invoice_number: string | null
-          paid_amount: number
+          paid_amount: number | null
           purchase_date: string
           status: string
-          supplier_id: string
+          supplier_id: string | null
           total_amount: number
           updated_at: string
           user_id: string
@@ -557,10 +620,10 @@ export type Database = {
           due_date?: string | null
           id?: string
           invoice_number?: string | null
-          paid_amount?: number
+          paid_amount?: number | null
           purchase_date?: string
           status?: string
-          supplier_id: string
+          supplier_id?: string | null
           total_amount?: number
           updated_at?: string
           user_id: string
@@ -571,10 +634,10 @@ export type Database = {
           due_date?: string | null
           id?: string
           invoice_number?: string | null
-          paid_amount?: number
+          paid_amount?: number | null
           purchase_date?: string
           status?: string
-          supplier_id?: string
+          supplier_id?: string | null
           total_amount?: number
           updated_at?: string
           user_id?: string
@@ -627,14 +690,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      restore_product_stock: {
-        Args: { product_id: string; quantity_restored: number; user_id: string }
-        Returns: undefined
-      }
-      update_product_stock: {
-        Args: { product_id: string; quantity_sold: number; user_id: string }
-        Returns: undefined
-      }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never

@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { PlusCircle, FileText, Printer, ShoppingCart, Download, Edit, Settings, Calculator } from "lucide-react";
+import { PlusCircle, FileText, Printer, ShoppingCart, Download, Edit, Settings, Calculator, Trash2 } from "lucide-react";
 import { ProfessionalBudget } from "./ProfessionalBudget";
 import { BudgetList } from "./BudgetList";
 
@@ -112,6 +112,11 @@ function LegacyBudgetManagement({ products, onSaleCreated }: BudgetManagementPro
   const [selectedProducts, setSelectedProducts] = useState<BudgetItem[]>([]);
   const [currentProduct, setCurrentProduct] = useState("");
   const [currentQuantity, setCurrentQuantity] = useState("");
+  const [manualProduct, setManualProduct] = useState({
+    name: "",
+    price: "",
+    quantity: "1"
+  });
   const [customerName, setCustomerName] = useState("");
   const [customerDocument, setCustomerDocument] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
@@ -125,16 +130,39 @@ function LegacyBudgetManagement({ products, onSaleCreated }: BudgetManagementPro
     if (currentProduct && currentQuantity) {
       const product = products.find(p => p.id.toString() === currentProduct);
       if (product) {
+        const quantity = parseInt(currentQuantity);
+        if (quantity > product.stock) {
+          alert(`Quantidade solicitada (${quantity}) superior ao estoque disponível (${product.stock})`);
+          return;
+        }
+        
         const budgetItem: BudgetItem = {
           productId: product.id,
           productName: product.name,
-          quantity: parseInt(currentQuantity),
+          quantity: quantity,
           price: product.price,
         };
         setSelectedProducts([...selectedProducts, budgetItem]);
         setCurrentProduct("");
         setCurrentQuantity("");
       }
+    }
+  };
+
+  const addManualProductToBudget = () => {
+    if (manualProduct.name.trim() && manualProduct.price && parseFloat(manualProduct.price) > 0) {
+      const quantity = parseInt(manualProduct.quantity) || 1;
+      const price = parseFloat(manualProduct.price);
+      
+      const budgetItem: BudgetItem = {
+        productId: Date.now(), // ID único temporário para produtos manuais
+        productName: manualProduct.name.trim(),
+        quantity: quantity,
+        price: price,
+      };
+      
+      setSelectedProducts([...selectedProducts, budgetItem]);
+      setManualProduct({ name: "", price: "", quantity: "1" });
     }
   };
 
@@ -156,7 +184,7 @@ function LegacyBudgetManagement({ products, onSaleCreated }: BudgetManagementPro
     }, 0);
   };
 
-  const createBudget = () => {
+  const createBudget = async () => {
     if (selectedProducts.length > 0 && customerName && customerDocument) {
       const total = calculateTotal();
       const profit = calculateProfit();
@@ -179,7 +207,11 @@ function LegacyBudgetManagement({ products, onSaleCreated }: BudgetManagementPro
         status: 'orcamento',
         validUntil: validUntil || new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
       };
+
+      // Salvar no localStorage para compatibilidade
       setBudgets([newBudget, ...budgets]);
+      
+      // Limpar campos
       setSelectedProducts([]);
       setCustomerName("");
       setCustomerDocument("");
@@ -187,6 +219,11 @@ function LegacyBudgetManagement({ products, onSaleCreated }: BudgetManagementPro
       setCustomerPhone("");
       setValidUntil("");
       setIsDialogOpen(false);
+
+      // Mostrar sucesso
+      alert("Orçamento criado com sucesso! Use a aba 'Orçamentos Salvos' para visualizar e gerenciar seus orçamentos.");
+    } else {
+      alert("Por favor, preencha todos os campos obrigatórios e adicione pelo menos um produto.");
     }
   };
 
@@ -659,14 +696,17 @@ function LegacyBudgetManagement({ products, onSaleCreated }: BudgetManagementPro
             <DialogTrigger asChild>
               <Button variant="default" className="flex items-center space-x-2">
                 <PlusCircle className="w-4 h-4" />
-                <span>Novo Orçamento</span>
+                <span>🆕 Novo Orçamento Simples</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Criar Novo Orçamento</DialogTitle>
+                <DialogTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Criar Novo Orçamento
+                </DialogTitle>
                 <DialogDescription>
-                  Selecione os produtos e quantidades para o orçamento.
+                  📋 Preencha os dados do cliente e adicione produtos para gerar o orçamento.
                 </DialogDescription>
               </DialogHeader>
                
@@ -744,56 +784,138 @@ function LegacyBudgetManagement({ products, onSaleCreated }: BudgetManagementPro
                   />
                 </div>
 
-                {/* Adicionar produto */}
-                <div className="flex space-x-2">
-                  <div className="flex-1">
-                    <Select value={currentProduct} onValueChange={setCurrentProduct}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione um produto" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {products.map((product) => (
-                          <SelectItem key={product.id} value={product.id.toString()}>
-                            {product.name} - {formatCurrency(product.price)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="w-24">
-                    <Input
-                      type="number"
-                      placeholder="Qtd"
-                      value={currentQuantity}
-                      onChange={(e) => setCurrentQuantity(e.target.value)}
-                    />
-                  </div>
-                  <Button onClick={addProductToBudget} disabled={!currentProduct || !currentQuantity}>
-                    Adicionar
-                  </Button>
-                </div>
+                {/* Abas para adicionar produtos */}
+                <Tabs defaultValue="catalog" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="catalog">Produtos do Catálogo</TabsTrigger>
+                    <TabsTrigger value="manual">Produto Manual</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="catalog" className="space-y-4">
+                    <div className="flex space-x-2">
+                      <div className="flex-1">
+                        <Select value={currentProduct} onValueChange={setCurrentProduct}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione um produto do catálogo" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-48">
+                            {products.filter(p => p.stock > 0).map((product) => (
+                              <SelectItem key={product.id} value={product.id.toString()}>
+                                <div className="flex flex-col">
+                                  <span>{product.name}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {formatCurrency(product.price)} • Estoque: {product.stock}
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="w-24">
+                        <Input
+                          type="number"
+                          placeholder="Qtd"
+                          min="1"
+                          value={currentQuantity}
+                          onChange={(e) => setCurrentQuantity(e.target.value)}
+                        />
+                      </div>
+                      <Button onClick={addProductToBudget} disabled={!currentProduct || !currentQuantity}>
+                        <PlusCircle className="w-4 h-4 mr-1" />
+                        Adicionar
+                      </Button>
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="manual" className="space-y-4">
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label className="text-sm">Nome do Produto</Label>
+                          <Input
+                            placeholder="Ex: Gesso em pó especial"
+                            value={manualProduct.name}
+                            onChange={(e) => setManualProduct({...manualProduct, name: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm">Preço Unitário</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0,00"
+                            value={manualProduct.price}
+                            onChange={(e) => setManualProduct({...manualProduct, price: e.target.value})}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex space-x-2">
+                        <div className="w-24">
+                          <Label className="text-sm">Quantidade</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            placeholder="1"
+                            value={manualProduct.quantity}
+                            onChange={(e) => setManualProduct({...manualProduct, quantity: e.target.value})}
+                          />
+                        </div>
+                        <div className="flex-1 flex items-end">
+                          <Button 
+                            onClick={addManualProductToBudget} 
+                            disabled={!manualProduct.name || !manualProduct.price || parseFloat(manualProduct.price) <= 0}
+                            className="w-full"
+                          >
+                            <PlusCircle className="w-4 h-4 mr-1" />
+                            Adicionar Produto Manual
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
 
                 {selectedProducts.length > 0 && (
                   <div className="space-y-2">
-                    <Label>Produtos Selecionados</Label>
-                    <div className="border rounded-lg p-4 space-y-2 max-h-40 overflow-y-auto">
-                      {selectedProducts.map((item, index) => (
-                        <div key={index} className="flex items-center justify-between bg-muted p-2 rounded">
-                          <span className="text-sm">
-                            {item.productName} - Qtd: {item.quantity} - {formatCurrency(item.price * item.quantity)}
+                    <Label>Produtos Selecionados ({selectedProducts.length})</Label>
+                    <div className="border rounded-lg max-h-80 overflow-y-auto bg-muted/20">
+                      <div className="p-4 space-y-2">
+                        {selectedProducts.map((item, index) => (
+                          <div key={index} className="flex items-center justify-between bg-card p-3 rounded-lg shadow-sm border">
+                            <div className="flex-1">
+                              <span className="text-sm font-medium">{item.productName}</span>
+                              <div className="text-xs text-muted-foreground">
+                                Qtd: {item.quantity} × {formatCurrency(item.price)} = {formatCurrency(item.price * item.quantity)}
+                              </div>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeProductFromBudget(index)}
+                              className="ml-2 text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="sticky bottom-0 bg-card border-t p-4">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-muted-foreground">
+                            {selectedProducts.reduce((sum, item) => sum + item.quantity, 0)} itens
                           </span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeProductFromBudget(index)}
-                          >
-                            Remover
-                          </Button>
+                          <div className="text-right">
+                            <div className="text-lg font-bold text-profit">
+                              Total: {formatCurrency(calculateTotal())}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Lucro: {formatCurrency(calculateProfit())}
+                            </div>
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                    <div className="text-right font-bold">
-                      Total: {formatCurrency(calculateTotal())}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -813,83 +935,107 @@ function LegacyBudgetManagement({ products, onSaleCreated }: BudgetManagementPro
       </div>
 
       {/* Lista de Orçamentos */}
-      <div className="grid gap-4">
-        {budgets.map((budget) => (
-          <Card key={budget.id} className="w-full">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center space-x-2">
-                    <FileText className="w-5 h-5" />
-                    <span>Orçamento #{budget.id}</span>
-                    <Badge variant={getStatusBadge(budget.status).variant}>
-                      {getStatusBadge(budget.status).label}
-                    </Badge>
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Cliente: {budget.customerName} | Data: {new Date(budget.date).toLocaleDateString('pt-BR')}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold">{formatCurrency(budget.total)}</p>
-                  <p className="text-sm text-green-600 font-medium">
-                    Lucro: {formatCurrency(budget.profit)}
-                  </p>
-                </div>
-              </div>
-            </CardHeader>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-semibold">Orçamentos Criados ({budgets.length})</h3>
+          {budgets.length > 0 && (
+            <Badge variant="outline" className="text-sm">
+              Total: {formatCurrency(budgets.reduce((sum, b) => sum + b.total, 0))}
+            </Badge>
+          )}
+        </div>
+        
+        {budgets.length === 0 ? (
+          <Card className="text-center py-12">
             <CardContent>
-              <div className="space-y-3">
-                <div>
-                  <h4 className="font-medium mb-2">Produtos:</h4>
-                  <div className="space-y-1">
-                    {budget.products.map((product, index) => (
-                      <div key={index} className="flex justify-between text-sm">
-                        <span>{product.name}</span>
-                        <span>{product.quantity}x - {formatCurrency(product.price * product.quantity)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                
-                <div className="flex justify-between pt-3 border-t">
-                  <div className="flex space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => printBudget(budget)}
-                    >
-                      <Printer className="w-4 h-4 mr-1" />
-                      Imprimir
-                    </Button>
-                    
-                    {budget.status === 'orcamento' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => convertToPedido(budget.id)}
-                      >
-                        <Edit className="w-4 h-4 mr-1" />
-                        Converter em Pedido
-                      </Button>
-                    )}
-                    
-                    {(budget.status === 'orcamento' || budget.status === 'pedido') && (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => convertToSale(budget)}
-                      >
-                        <ShoppingCart className="w-4 h-4 mr-1" />
-                        Converter em Venda
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Nenhum orçamento criado</h3>
+              <p className="text-muted-foreground mb-4">
+                Clique em "Novo Orçamento" para começar
+              </p>
             </CardContent>
           </Card>
-        ))}
+        ) : (
+          <div className="max-h-96 overflow-y-auto space-y-4 pr-2">
+            {budgets.map((budget) => (     
+              <Card key={budget.id} className="w-full">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center space-x-2">
+                        <FileText className="w-5 h-5" />
+                        <span>Orçamento #{budget.id}</span>
+                        <Badge variant={getStatusBadge(budget.status).variant}>
+                          {getStatusBadge(budget.status).label}
+                        </Badge>
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        Cliente: {budget.customerName} | Data: {new Date(budget.date).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold">{formatCurrency(budget.total)}</p>
+                      <p className="text-sm text-green-600 font-medium">
+                        Lucro: {formatCurrency(budget.profit)}
+                      </p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div>
+                      <h4 className="font-medium mb-2">Produtos:</h4>
+                      <div className="space-y-1">
+                        {budget.products.map((product, index) => (
+                          <div key={index} className="flex justify-between text-sm">
+                            <span>{product.name}</span>
+                            <span>{product.quantity}x - {formatCurrency(product.price * product.quantity)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-between pt-3 border-t">
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => printBudget(budget)}
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          <Printer className="w-4 h-4 mr-1" />
+                          🖨️ Imprimir Orçamento
+                        </Button>
+                        
+                        {budget.status === 'orcamento' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => convertToPedido(budget.id)}
+                          >
+                            <Edit className="w-4 h-4 mr-1" />
+                            Converter em Pedido
+                          </Button>
+                        )}
+                        
+                        {(budget.status === 'orcamento' || budget.status === 'pedido') && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => convertToSale(budget)}
+                          >
+                            <ShoppingCart className="w-4 h-4 mr-1" />
+                            Converter em Venda
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

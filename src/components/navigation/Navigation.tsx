@@ -18,7 +18,8 @@ import {
   CreditCard,
   AlertTriangle,
   LogOut,
-  Building2
+  Building2,
+  FileText
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -36,6 +37,7 @@ const navigationItems = [
   { id: "customers", label: "Clientes", icon: User },
   { id: "suppliers", label: "Fornecedores", icon: Building2 },
   { id: "budget", label: "Orçamentos", icon: BarChart3 },
+  { id: "invoices", label: "Nota Fiscal", icon: FileText },
   { id: "expenses", label: "Despesas", icon: CreditCard },
   { id: "withdrawals", label: "Retiradas", icon: DollarSign },
   { id: "reports", label: "Relatórios", icon: BarChart3 },

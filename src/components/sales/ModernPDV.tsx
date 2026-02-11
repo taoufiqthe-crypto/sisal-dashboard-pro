@@ -792,17 +792,47 @@ export function ModernPDV({
                 </div>
               </div>
 
-              <Button
-                onClick={() => setShowReceiptDialog(false)}
-                className="w-full h-12 pdv-btn-primary"
-              >
-                <Zap className="w-4 h-4 mr-2" />
-                Nova Venda
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowReceiptDialog(false)}
+                  className="flex-1 h-12"
+                >
+                  Fechar
+                </Button>
+                <Button
+                  onClick={() => setShowReceiptDialog(false)}
+                  className="flex-1 h-12 pdv-btn-primary"
+                >
+                  <Zap className="w-4 h-4 mr-2" />
+                  Nova Venda
+                </Button>
+              </div>
+
+              {/* Botão para reimprimir depois */}
+              <div className="pt-2 border-t">
+                <p className="text-xs text-muted-foreground text-center mb-2">
+                  💡 Você pode reimprimir este comprovante a qualquer momento
+                </p>
+              </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Botão de Impressão Rápida - Para vendas finalizadas */}
+      {lastSale && !showReceiptDialog && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <Button
+            onClick={() => setShowReceiptDialog(true)}
+            className="bg-green-600 hover:bg-green-700 text-white shadow-lg"
+            size="lg"
+          >
+            <Printer className="w-5 h-5 mr-2" />
+            Imprimir Última Venda
+          </Button>
+        </div>
+      )}
 
       {/* Dialog para Produto Manual */}
       <Dialog open={showManualProductDialog} onOpenChange={setShowManualProductDialog}>

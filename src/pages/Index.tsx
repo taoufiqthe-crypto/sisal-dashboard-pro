@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { InvoiceGenerator } from "@/components/sales/InvoiceGenerator";
 import { Navigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { Navigation } from "@/components/navigation/Navigation";
@@ -281,6 +282,8 @@ const Index = () => {
         return <WithdrawalsManagement />;
       case "reports":
         return <AdvancedReports />;
+      case "invoices":
+        return <InvoiceGenerator />;
       case "manufacturing":
         return (
           <ManufacturingTabs 
