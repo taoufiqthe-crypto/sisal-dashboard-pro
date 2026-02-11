@@ -15,19 +15,13 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { NewSale } from "./NewSale";
-import { PDVInterface } from "./PDVInterface";
 import { ModernPDV } from "./ModernPDV";
-import { SalesToday } from "./SalesToday";
-import { SalesMonth } from "./SalesMonth";
-import { SalesYear } from "./SalesYear";
-import { SalesHistory } from "./SalesHistory";
-import { SalesByPayment } from "./SalesByPayment";
 import { SalesAnalytics } from "./SalesAnalytics";
+import { SalesHistory } from "./SalesHistory";
 import { DataImporter } from "../imports/DataImporter";
 import {
   Sale,
   Product,
-  paymentMethods,
   Customer,
 } from "./types";
 
@@ -52,63 +46,48 @@ export function SalesManagement({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { updateProductStock, validateStock } = useStockManagement();
 
-  const formatCurrency = (value: number) => `R$ ${value.toFixed(2)}`;
-
-  const isToday = (date: string) => {
-    const today = new Date().toISOString().split("T")[0];
-    return date === today;
-  };
-
-  const isThisMonth = (date: string) => {
-    const d = new Date(date);
-    const now = new Date();
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  };
-
-  const isThisYear = (date: string) => {
-    const d = new Date(date);
-    const now = new Date();
-    return d.getFullYear() === now.getFullYear();
-  };
-
   const handleSaleCreated = async (newSale: Sale) => {
     try {
       // Validar estoque antes de finalizar venda
       if (newSale.cart && setProducts) {
         const stockValid = validateStock(products, newSale.cart);
         if (!stockValid) {
-          return; // Não finaliza a venda se estoque inválido
+          throw new Error("Estoque insuficiente");
         }
       }
 
       // Criar venda no Supabase
-      await createSale({
-        cart: newSale.cart || [],
-        total: newSale.total,
-        paymentMethod: newSale.paymentMethod,
-        customerId: newSale.customer?.id !== 0 ? newSale.customer?.id : undefined,
-        discount: newSale.discount,
-        date: new Date(newSale.date)
-      });
-      
-      // Salvar também no localStorage para compatibilidade com relatórios
+      try {
+        await createSale({
+          cart: newSale.cart || [],
+          total: newSale.total,
+          paymentMethod: newSale.paymentMethod,
+          customerId: newSale.customer?.id !== 0 ? newSale.customer?.id : undefined,
+          discount: newSale.discount,
+          date: new Date(newSale.date)
+        });
+      } catch (supabaseError) {
+        console.warn('Supabase save failed, saving locally:', supabaseError);
+      }
+
+      // Salvar no localStorage como fallback
       const storedSales = JSON.parse(localStorage.getItem('sales') || '[]');
       storedSales.unshift(newSale);
       localStorage.setItem('sales', JSON.stringify(storedSales));
       
-      // Atualizar estoque automaticamente usando o hook (para compatibilidade)
+      // Atualizar estoque localmente
       if (setProducts && newSale.cart) {
         updateProductStock(products, setProducts, newSale.cart);
       }
       
-      // Chamar callback se fornecido
+      // Chamar callback do Index.tsx
       if (onSaleCreated) {
         onSaleCreated(newSale);
       }
       
     } catch (error) {
       console.error('Erro ao processar venda:', error);
-      toast.error("Erro ao processar venda");
+      throw error; // Re-throw para que NewSale/ModernPDV saibam que falhou
     }
   };
 
@@ -173,7 +152,6 @@ export function SalesManagement({
               </Dialog>
           </div>
 
-          {/* Componente de Analytics Completo */}
           <SalesAnalytics sales={sales} />
 
           <SalesHistory 
@@ -192,12 +170,10 @@ export function SalesManagement({
               toast.success(`${newProducts.length} produtos importados!`);
             }}
             onSalesImported={(newSales) => {
-              // Adicionar vendas importadas ao localStorage para compatibilidade
               const storedSales = JSON.parse(localStorage.getItem('sales') || '[]');
               const updatedSales = [...newSales, ...storedSales];
               localStorage.setItem('sales', JSON.stringify(updatedSales));
               
-              // Criar vendas no Supabase
               newSales.forEach(sale => {
                 createSale({
                   cart: sale.cart || [],
@@ -206,7 +182,7 @@ export function SalesManagement({
                   customerId: sale.customer?.id !== 0 ? sale.customer?.id : undefined,
                   discount: 0,
                   date: new Date(sale.date)
-                });
+                }).catch(err => console.warn('Import sale to Supabase failed:', err));
               });
               
               toast.success(`${newSales.length} vendas importadas!`);

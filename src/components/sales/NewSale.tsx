@@ -16,19 +16,26 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Check, ChevronsUpDown, Receipt, Calendar, CalendarIcon } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Check, ChevronsUpDown, Receipt, Calendar, CalendarIcon, Printer } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 import { Product, Sale, SaleItem, Customer, paymentMethods } from "./types";
+import ReceiptPrinter from "./ReceiptPrinter";
 
 interface NewSaleProps {
   products: Product[];
   customers: Customer[];
   setCustomers: React.Dispatch<React.SetStateAction<Customer[]>>;
-  onSaleCreated: (sale: Sale) => void;
+  onSaleCreated: (sale: Sale) => void | Promise<void>;
   onClose: () => void;
 }
 
@@ -48,6 +55,9 @@ export function NewSale({
   const [keepSaleDate, setKeepSaleDate] = useState(true);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<"dinheiro" | "pix" | "credito" | "debito">("dinheiro");
   const [amountPaid, setAmountPaid] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showReceiptDialog, setShowReceiptDialog] = useState(false);
+  const [lastSale, setLastSale] = useState<Sale | null>(null);
 
   // Estados para cadastro rápido de cliente
   const [isAddingCustomer, setIsAddingCustomer] = useState(false);
@@ -60,13 +70,19 @@ export function NewSale({
   const [newProductPrice, setNewProductPrice] = useState("");
   const [newProductCost, setNewProductCost] = useState("");
 
-  const formatCurrency = useCallback((value: number) => `R$ ${value.toFixed(2)}`, []);
+  const formatCurrency = useCallback((value: number) => 
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value), []);
 
   const addProductToSale = useCallback(() => {
     if (currentProduct && currentQuantity) {
       const quantity = parseInt(currentQuantity);
       if (quantity <= 0) {
         toast.error("Quantidade deve ser maior que zero!");
+        return;
+      }
+
+      if (currentProduct.stock < quantity) {
+        toast.error(`Estoque insuficiente! Disponível: ${currentProduct.stock}`);
         return;
       }
 
@@ -100,7 +116,7 @@ export function NewSale({
     }
 
     const saleItem: SaleItem = {
-      productId: Date.now(), // ID temporário
+      productId: Date.now(),
       productName: newProductName.trim(),
       quantity: parseInt(currentQuantity),
       price: parseFloat(newProductPrice),
@@ -130,7 +146,6 @@ export function NewSale({
       if (productData) {
         return sum + item.quantity * (item.price - productData.cost);
       }
-      // Para produtos avulsos, estimar lucro baseado em 70% do preço de venda
       const estimatedCost = item.price * 0.3;
       return sum + item.quantity * (item.price - estimatedCost);
     }, 0), 
@@ -143,7 +158,7 @@ export function NewSale({
     return selectedPaymentMethod === "dinheiro" ? Math.max(0, paid - total) : 0;
   }, [calculateTotal, amountPaid, selectedPaymentMethod]);
 
-  const finalizeSale = useCallback(() => {
+  const finalizeSale = useCallback(async () => {
     if (selectedProducts.length === 0) {
       toast.error("Adicione pelo menos um produto à venda!");
       return;
@@ -160,37 +175,50 @@ export function NewSale({
       }
     }
 
-    // Validação adicional: se não há método de pagamento selecionado para outros métodos
-    if (!selectedPaymentMethod) {
-      toast.error("Selecione uma forma de pagamento!");
-      return;
+    // Validar estoque
+    for (const item of selectedProducts) {
+      const product = products.find(p => p.id === item.productId);
+      if (product && product.stock < item.quantity) {
+        toast.error(`Estoque insuficiente para ${product.name}. Disponível: ${product.stock}`);
+        return;
+      }
     }
 
-    const total = calculateTotal();
-    const profit = calculateProfit();
-    const paid = parseFloat(amountPaid) || total;
-    const finalAmountPaid = ["pix", "credito", "debito"].includes(selectedPaymentMethod) ? total : paid;
-
-    const newSale: Sale = {
-      id: Date.now(),
-      date: saleDate.toISOString().split("T")[0],
-      products: selectedProducts.map((item) => ({
-        name: item.productName,
-        quantity: item.quantity,
-        price: item.price,
-      })),
-      cart: selectedProducts,
-      total,
-      profit,
-      paymentMethod: selectedPaymentMethod,
-      amountPaid: finalAmountPaid,
-      change: calculateChange(),
-      status: "pago",
-      customer: selectedCustomer || { id: Date.now(), name: "Cliente Avulso" },
-    };
+    setIsProcessing(true);
 
     try {
-      onSaleCreated(newSale);
+      const total = calculateTotal();
+      const profit = calculateProfit();
+      const paid = parseFloat(amountPaid) || total;
+      const finalAmountPaid = ["pix", "credito", "debito"].includes(selectedPaymentMethod) ? total : paid;
+
+      const newSale: Sale = {
+        id: Date.now(),
+        date: saleDate.toISOString().split("T")[0],
+        products: selectedProducts.map((item) => ({
+          name: item.productName,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+        cart: selectedProducts,
+        total,
+        profit,
+        paymentMethod: selectedPaymentMethod,
+        amountPaid: finalAmountPaid,
+        change: calculateChange(),
+        status: "pago",
+        customer: selectedCustomer || { id: Date.now(), name: "Cliente Avulso" },
+      };
+
+      // Aguardar processamento
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Chamar callback - await caso seja async
+      await Promise.resolve(onSaleCreated(newSale));
+      
+      // Salvar para exibir comprovante
+      setLastSale(newSale);
+      setShowReceiptDialog(true);
       
       // Limpar formulário após sucesso
       setSelectedProducts([]);
@@ -198,7 +226,6 @@ export function NewSale({
       setCurrentQuantity("");
       setSelectedCustomer(null);
       setAmountPaid("");
-      // Só reseta a data se não estiver mantendo
       if (!keepSaleDate) {
         setSaleDate(new Date());
       }
@@ -212,10 +239,11 @@ export function NewSale({
       setNewProductCost("");
       
       toast.success("✅ Venda finalizada com sucesso!");
-      onClose();
     } catch (error) {
       console.error("Erro ao finalizar venda:", error);
       toast.error("❌ Erro ao finalizar a venda. Tente novamente.");
+    } finally {
+      setIsProcessing(false);
     }
   }, [
     selectedProducts,
@@ -228,8 +256,8 @@ export function NewSale({
     saleDate,
     selectedCustomer,
     onSaleCreated,
-    onClose,
-    keepSaleDate
+    keepSaleDate,
+    products
   ]);
 
   return (
@@ -318,8 +346,6 @@ export function NewSale({
                       {c.name} {c.phone ? `(${c.phone})` : ""}
                     </CommandItem>
                   ))}
-
-                  {/* opção para adicionar novo cliente */}
                   <CommandItem
                     onSelect={() => setIsAddingCustomer(true)}
                     className="text-primary cursor-pointer"
@@ -355,6 +381,10 @@ export function NewSale({
           <div className="flex space-x-2">
             <Button
               onClick={() => {
+                if (!newCustomerName.trim()) {
+                  toast.error("Nome do cliente é obrigatório!");
+                  return;
+                }
                 const newCustomer: Customer = {
                   id: Date.now(),
                   name: newCustomerName,
@@ -367,6 +397,7 @@ export function NewSale({
                 setNewCustomerName("");
                 setNewCustomerPhone("");
                 setNewCustomerEmail("");
+                toast.success("Cliente adicionado!");
               }}
             >
               Salvar Cliente
@@ -419,7 +450,7 @@ export function NewSale({
                                   : "opacity-0"
                               }`}
                             />
-                            {product.name} — {formatCurrency(product.price)}
+                            {product.name} — {formatCurrency(product.price)} (Est: {product.stock})
                           </CommandItem>
                         ))}
                       </CommandGroup>
@@ -483,7 +514,7 @@ export function NewSale({
         </div>
         
         <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
-          💡 Você pode adicionar produtos do estoque ou criar produtos avulsos. Adicione quantos produtos desejar antes de finalizar a venda.
+          💡 Adicione produtos do estoque ou crie produtos avulsos. Adicione quantos produtos desejar antes de finalizar a venda.
         </div>
       </div>
 
@@ -520,13 +551,13 @@ export function NewSale({
           <div className="border-t pt-3 space-y-1">
             <div className="flex justify-between">
               <span className="font-semibold">Total:</span>
-              <span className="font-bold text-revenue">
+              <span className="font-bold text-primary text-lg">
                 {formatCurrency(calculateTotal())}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="font-semibold">Lucro:</span>
-              <span className="font-bold text-profit">
+              <span className="font-semibold">Lucro estimado:</span>
+              <span className="font-bold text-green-600">
                 {formatCurrency(calculateProfit())}
               </span>
             </div>
@@ -566,7 +597,7 @@ export function NewSale({
                 placeholder={formatCurrency(calculateTotal())}
               />
               {amountPaid && parseFloat(amountPaid) >= calculateTotal() && (
-                <p className="text-success font-semibold">
+                <p className="text-green-600 font-semibold">
                   Troco: {formatCurrency(calculateChange())}
                 </p>
               )}
@@ -577,18 +608,89 @@ export function NewSale({
 
       {/* Ações */}
       <div className="sticky bottom-0 bg-background flex justify-end space-x-2 pt-4 border-t">
-        <Button variant="outline" onClick={onClose}>
+        <Button variant="outline" onClick={onClose} disabled={isProcessing}>
           Cancelar
         </Button>
         <Button
           onClick={finalizeSale}
-          disabled={selectedProducts.length === 0}
+          disabled={selectedProducts.length === 0 || isProcessing}
           className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md font-semibold shadow-lg"
         >
           <Receipt className="w-4 h-4 mr-2" />
-          Finalizar Venda ({formatCurrency(calculateTotal())})
+          {isProcessing ? "Processando..." : `Finalizar Venda (${formatCurrency(calculateTotal())})`}
         </Button>
       </div>
+
+      {/* Receipt Dialog */}
+      <Dialog open={showReceiptDialog} onOpenChange={(open) => {
+        setShowReceiptDialog(open);
+        if (!open) onClose();
+      }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Printer className="w-5 h-5 text-green-600" />
+              Venda Finalizada com Sucesso!
+            </DialogTitle>
+          </DialogHeader>
+          
+          {lastSale && (
+            <div className="space-y-4">
+              <ReceiptPrinter sale={lastSale} />
+              
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="font-semibold text-green-700 dark:text-green-400">Pagamento processado!</span>
+                </div>
+                
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Total:</span>
+                    <span className="font-semibold">{formatCurrency(lastSale.total)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Pagamento:</span>
+                    <span>{lastSale.paymentMethod.toUpperCase()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Valor pago:</span>
+                    <span>{formatCurrency(lastSale.amountPaid)}</span>
+                  </div>
+                  {lastSale.change > 0 && (
+                    <div className="flex justify-between">
+                      <span>Troco:</span>
+                      <span className="font-semibold">{formatCurrency(lastSale.change)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowReceiptDialog(false);
+                    onClose();
+                  }}
+                  className="flex-1"
+                >
+                  Fechar
+                </Button>
+                <Button
+                  onClick={() => {
+                    setShowReceiptDialog(false);
+                    // Don't close - allow creating another sale
+                  }}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                >
+                  Nova Venda
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
