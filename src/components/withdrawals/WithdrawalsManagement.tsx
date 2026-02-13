@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,153 +10,284 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { PlusCircle, Calendar, DollarSign } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { PlusCircle, Calendar, DollarSign, TrendingUp, TrendingDown, Trash2, AlertTriangle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface Withdrawal {
   id: number;
   date: string;
   amount: number;
+  description: string;
+  type: "pessoal" | "empresa";
 }
 
+const loadWithdrawals = (): Withdrawal[] => {
+  try {
+    const stored = localStorage.getItem("withdrawals");
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+};
+
 export function WithdrawalsManagement() {
-  const [dailyWithdrawals, setDailyWithdrawals] = useState<Withdrawal[]>([]);
-  const [newWithdrawalValue, setNewWithdrawalValue] = useState<string>("");
-  const [newWithdrawalDate, setNewWithdrawalDate] = useState<string>("");
-  const [isDialogOpen, setIsDialogOpen] = useState<boolean>(false);
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>(loadWithdrawals);
+  const [newAmount, setNewAmount] = useState("");
+  const [newDate, setNewDate] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [newType, setNewType] = useState<"pessoal" | "empresa">("pessoal");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [filterType, setFilterType] = useState<"todos" | "pessoal" | "empresa">("todos");
 
-  const handleAddWithdrawal = () => {
-    if (
-      newWithdrawalValue.trim() !== "" &&
-      !isNaN(parseFloat(newWithdrawalValue))
-    ) {
-      const chosenDate = newWithdrawalDate
-        ? new Date(newWithdrawalDate).toLocaleDateString("pt-BR")
-        : new Date().toLocaleDateString("pt-BR");
+  // Persist
+  useEffect(() => {
+    localStorage.setItem("withdrawals", JSON.stringify(withdrawals));
+  }, [withdrawals]);
 
-      const newEntry: Withdrawal = {
-        id: Date.now(),
-        date: chosenDate,
-        amount: parseFloat(newWithdrawalValue),
-      };
+  // Load sales profit for comparison
+  const getSalesProfit = (): number => {
+    try {
+      const sales = JSON.parse(localStorage.getItem("sales") || "[]");
+      return sales.reduce((sum: number, s: any) => sum + (s.profit || 0), 0);
+    } catch {
+      return 0;
+    }
+  };
 
-      setDailyWithdrawals([...dailyWithdrawals, newEntry]);
-      setNewWithdrawalValue("");
-      setNewWithdrawalDate("");
-      setIsDialogOpen(false);
+  const handleAdd = () => {
+    if (!newAmount || isNaN(parseFloat(newAmount)) || parseFloat(newAmount) <= 0) return;
+
+    const entry: Withdrawal = {
+      id: Date.now(),
+      date: newDate
+        ? new Date(newDate).toLocaleDateString("pt-BR")
+        : new Date().toLocaleDateString("pt-BR"),
+      amount: parseFloat(newAmount),
+      description: newDescription || (newType === "pessoal" ? "Retirada pessoal" : "Despesa da empresa"),
+      type: newType,
+    };
+
+    setWithdrawals(prev => [entry, ...prev]);
+    setNewAmount("");
+    setNewDate("");
+    setNewDescription("");
+    setNewType("pessoal");
+    setIsDialogOpen(false);
+  };
+
+  const handleDelete = (id: number) => {
+    if (window.confirm("Deseja excluir esta retirada?")) {
+      setWithdrawals(prev => prev.filter(w => w.id !== id));
     }
   };
 
   const formatCurrency = (value: number) =>
     value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-  // 🔎 Calcula o total de retiradas
-  const totalWithdrawals = dailyWithdrawals.reduce(
-    (total, entry) => total + entry.amount,
-    0
-  );
+  const filtered = filterType === "todos"
+    ? withdrawals
+    : withdrawals.filter(w => w.type === filterType);
+
+  const totalPessoal = withdrawals.filter(w => w.type === "pessoal").reduce((s, w) => s + w.amount, 0);
+  const totalEmpresa = withdrawals.filter(w => w.type === "empresa").reduce((s, w) => s + w.amount, 0);
+  const totalGeral = totalPessoal + totalEmpresa;
+  const lucroTotal = getSalesProfit();
+  const lucroLiquido = lucroTotal - totalPessoal;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">
-            Controle de Retiradas Diárias
-          </h2>
+          <h2 className="text-3xl font-bold tracking-tight">Controle de Retiradas</h2>
           <p className="text-muted-foreground">
-            Registre e acompanhe o total de retiradas do caixa.
+            Registre retiradas pessoais separadamente do lucro da empresa.
           </p>
         </div>
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="flex items-center space-x-2">
-              <PlusCircle className="w-4 h-4" />
-              <span>Nova Retirada</span>
+            <Button>
+              <PlusCircle className="w-4 h-4 mr-2" />
+              Nova Retirada
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>Registrar Retirada</DialogTitle>
             </DialogHeader>
-
             <div className="grid gap-4 py-4">
-              {/* Valor */}
               <div className="space-y-2">
-                <Label htmlFor="amount">Valor da Retirada (R$)</Label>
+                <Label>Tipo de Retirada</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={newType === "pessoal" ? "default" : "outline"}
+                    onClick={() => setNewType("pessoal")}
+                    className="flex-1"
+                  >
+                    💰 Pessoal
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={newType === "empresa" ? "default" : "outline"}
+                    onClick={() => setNewType("empresa")}
+                    className="flex-1"
+                  >
+                    🏢 Empresa
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="amount">Valor (R$)</Label>
                 <Input
                   id="amount"
                   type="number"
+                  step="0.01"
                   placeholder="Ex: 250.00"
-                  value={newWithdrawalValue}
-                  onChange={(e) => setNewWithdrawalValue(e.target.value)}
+                  value={newAmount}
+                  onChange={(e) => setNewAmount(e.target.value)}
                 />
               </div>
-
-              {/* Data */}
               <div className="space-y-2">
-                <Label htmlFor="date">Data da Retirada</Label>
+                <Label htmlFor="description">Descrição</Label>
+                <Input
+                  id="description"
+                  placeholder="Ex: Conta pessoal, Aluguel..."
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="date">Data</Label>
                 <Input
                   id="date"
                   type="date"
-                  value={newWithdrawalDate}
-                  onChange={(e) => setNewWithdrawalDate(e.target.value)}
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
                 />
               </div>
             </div>
-
             <div className="flex justify-end">
-              <Button onClick={handleAddWithdrawal}>Salvar Retirada</Button>
+              <Button onClick={handleAdd}>Salvar Retirada</Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* 🔎 Total de retiradas */}
-      <Card className="p-4 flex items-center justify-between bg-slate-50 dark:bg-slate-800">
-        <div className="flex items-center space-x-2">
-          <DollarSign className="w-6 h-6 text-green-600" />
-          <span className="text-lg font-semibold text-green-700 dark:text-green-400">
-            Total retirado
-          </span>
-        </div>
-        <div className="text-xl font-bold text-green-700 dark:text-green-400">
-          {formatCurrency(totalWithdrawals)}
-        </div>
-      </Card>
+      {/* Cards de resumo */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="p-4">
+          <div className="flex items-center space-x-2 mb-2">
+            <TrendingUp className="w-5 h-5 text-green-600" />
+            <span className="text-sm font-medium text-muted-foreground">Lucro Total (Vendas)</span>
+          </div>
+          <p className="text-2xl font-bold text-green-600">{formatCurrency(lucroTotal)}</p>
+        </Card>
 
-      {/* Histórico */}
-      <div>
-        <h3 className="text-xl font-bold mb-4">Histórico de Retiradas</h3>
-        <div className="grid gap-4">
-          {dailyWithdrawals.length > 0 ? (
-            dailyWithdrawals.map((entry) => (
-              <Card
-                key={entry.id}
-                className="p-4 flex items-center justify-between"
-              >
-                <div className="flex items-center space-x-3">
-                  <Calendar className="w-5 h-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-lg font-semibold">{entry.date}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Valor Retirado
-                    </p>
-                  </div>
-                </div>
-                <div className="text-lg font-bold">
-                  {formatCurrency(entry.amount)}
-                </div>
-              </Card>
-            ))
-          ) : (
-            <Card className="p-8 text-center">
-              <p className="text-muted-foreground">
-                Nenhuma retirada registrada ainda.
-              </p>
-            </Card>
-          )}
+        <Card className="p-4 border-orange-200 dark:border-orange-800">
+          <div className="flex items-center space-x-2 mb-2">
+            <DollarSign className="w-5 h-5 text-orange-600" />
+            <span className="text-sm font-medium text-muted-foreground">Retiradas Pessoais</span>
+          </div>
+          <p className="text-2xl font-bold text-orange-600">{formatCurrency(totalPessoal)}</p>
+        </Card>
+
+        <Card className="p-4 border-blue-200 dark:border-blue-800">
+          <div className="flex items-center space-x-2 mb-2">
+            <TrendingDown className="w-5 h-5 text-blue-600" />
+            <span className="text-sm font-medium text-muted-foreground">Despesas da Empresa</span>
+          </div>
+          <p className="text-2xl font-bold text-blue-600">{formatCurrency(totalEmpresa)}</p>
+        </Card>
+
+        <Card className="p-4 border-green-200 dark:border-green-800">
+          <div className="flex items-center space-x-2 mb-2">
+            <AlertTriangle className="w-5 h-5 text-emerald-600" />
+            <span className="text-sm font-medium text-muted-foreground">Lucro Líquido</span>
+          </div>
+          <p className={`text-2xl font-bold ${lucroLiquido >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+            {formatCurrency(lucroLiquido)}
+          </p>
+          <p className="text-xs text-muted-foreground">Lucro - Retiradas pessoais</p>
+        </Card>
+      </div>
+
+      {/* Filtro */}
+      <div className="flex items-center gap-2">
+        <Label>Filtrar:</Label>
+        <div className="flex gap-2">
+          {(["todos", "pessoal", "empresa"] as const).map(type => (
+            <Button
+              key={type}
+              variant={filterType === type ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilterType(type)}
+            >
+              {type === "todos" ? "Todos" : type === "pessoal" ? "💰 Pessoal" : "🏢 Empresa"}
+            </Button>
+          ))}
         </div>
       </div>
+
+      {/* Tabela de retiradas */}
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold mb-4">Histórico de Retiradas</h3>
+        {filtered.length === 0 ? (
+          <p className="text-muted-foreground text-center py-8">
+            Nenhuma retirada registrada ainda.
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Data</TableHead>
+                <TableHead>Descrição</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Valor</TableHead>
+                <TableHead className="w-12"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((entry) => (
+                <TableRow key={entry.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-muted-foreground" />
+                      {entry.date}
+                    </div>
+                  </TableCell>
+                  <TableCell>{entry.description}</TableCell>
+                  <TableCell>
+                    <Badge variant={entry.type === "pessoal" ? "secondary" : "default"}>
+                      {entry.type === "pessoal" ? "💰 Pessoal" : "🏢 Empresa"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="font-semibold text-red-600">
+                    - {formatCurrency(entry.amount)}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(entry.id)}
+                    >
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
     </div>
   );
 }

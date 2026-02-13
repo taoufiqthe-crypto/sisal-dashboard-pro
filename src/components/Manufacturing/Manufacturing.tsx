@@ -56,6 +56,7 @@ export function Manufacturing({
     quantity: "",
     gessoSacos: "",
     colaborador: "",
+    quebra: "",
   });
 
   const [selectedColaborador, setSelectedColaborador] = useState<string>("Todos");
@@ -91,6 +92,7 @@ export function Manufacturing({
       id: newId,
       quantity: Number(productionData.quantity) || 0,
       gessoSacos: Number(productionData.gessoSacos) || 0,
+      quebra: Number(productionData.quebra) || 0,
     };
 
     setProductions((prev) => [...prev, newProduction]);
@@ -101,6 +103,7 @@ export function Manufacturing({
       quantity: "",
       gessoSacos: "",
       colaborador: "",
+      quebra: "",
     });
     setIsModalOpen(false);
   };
@@ -115,6 +118,11 @@ export function Manufacturing({
 
   const totalGessoSacos = productions.reduce(
     (total, prod) => total + (Number(prod.gessoSacos) || 0),
+    0
+  );
+
+  const totalQuebra = productions.reduce(
+    (total, prod) => total + (Number(prod.quebra) || 0),
     0
   );
 
@@ -176,6 +184,14 @@ export function Manufacturing({
           </div>
           <Package className="w-8 h-8 text-muted-foreground" />
         </Card>
+
+        <Card className="p-6 flex items-center justify-between border-red-200 dark:border-red-800">
+          <div>
+            <p className="text-sm font-medium text-red-600 dark:text-red-400">Quebra / Perda Total</p>
+            <h3 className="text-2xl font-bold mt-1 text-red-600 dark:text-red-400">{totalQuebra}</h3>
+          </div>
+          <Package className="w-8 h-8 text-red-400" />
+        </Card>
       </div>
 
       {/* FILTRO por colaborador — usando <select> nativo (evita bug de overlay) */}
@@ -219,6 +235,11 @@ export function Manufacturing({
                 <p>
                   <strong>Sacos de Gesso:</strong> {prod.gessoSacos}
                 </p>
+                {(Number(prod.quebra) || 0) > 0 && (
+                  <p className="text-red-600 font-semibold">
+                    ⚠️ Quebra/Perda: {prod.quebra} peças
+                  </p>
+                )}
                 <p className="text-green-600 font-semibold">
                   👷 Colaborador: {prod.colaborador || "Não informado"}
                 </p>
@@ -265,6 +286,11 @@ export function Manufacturing({
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="gessoSacos" className="text-right">Sacos de Gesso</Label>
               <Input id="gessoSacos" type="number" value={productionData.gessoSacos} onChange={handleInputChange} className="col-span-3" />
+            </div>
+
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="quebra" className="text-right">Quebra / Perda</Label>
+              <Input id="quebra" type="number" value={productionData.quebra} onChange={handleInputChange} className="col-span-3" placeholder="Peças quebradas ou perdidas" />
             </div>
 
             <div className="grid grid-cols-4 items-center gap-4">
